@@ -131,31 +131,17 @@ export default function SignupPage() {
   }, [formData, isUsernameVerified]);
 
   // 회원가입 처리
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
-    setErrors({});
-
+    
     try {
-      setIsLoading(true);
-
-      // 유효성 검사
-      if (!isUsernameVerified) {
-        alert('사용자명 중복 확인이 필요합니다.');
-        return;
-      }
-
+      // 클라이언트 측 유효성 검사 강화
       if (!isEmailVerified) {
-        alert('이메일 인증이 필요합니다.');
+        setErrors(prev => ({ ...prev, email: '이메일 인증이 필요합니다.' }));
         return;
       }
-
-      if (formData.password !== formData.confirmPassword) {
-        setErrors(prev => ({ ...prev, confirmPassword: '비밀번호가 일치하지 않습니다.' }));
-        return;
-      }
-
-      // 회원가입 API 호출
-      const response = await axiosInstance.post('/auth/signup', {
+      
+      const response = await axiosInstance.post('/api/auth/signup', {
         username: formData.username,
         email: formData.email,
         password: formData.password,
@@ -163,17 +149,10 @@ export default function SignupPage() {
       });
 
       if (response.data.success) {
-        localStorage.removeItem('signupData');
-        alert('회원가입이 완료되었습니다.');
-        router.push('/login');
-      } else {
-        alert(response.data.message || '회원가입에 실패했습니다.');
+        router.push('/login?registered=true');
       }
     } catch (error: any) {
-      console.error('Signup error:', error);
-      alert(error.response?.data?.message || '회원가입 처리 중 오류가 발생했습니다.');
-    } finally {
-      setIsLoading(false);
+      setErrors(prev => ({ ...prev, signup: '회원가입 중 오류가 발생했습니다.' }));
     }
   };
 
@@ -215,7 +194,7 @@ export default function SignupPage() {
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSignup} className="space-y-6">
           <div>
             <Label htmlFor="username">사용자명 (한글)</Label>
             <div className="flex gap-2">

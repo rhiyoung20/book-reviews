@@ -21,38 +21,36 @@ import { Button } from '@/components/ui/Button';
 
      const handleSubmit = async (e: React.FormEvent) => {
        e.preventDefault();
+       
        try {
          const token = localStorage.getItem('token');
          if (!token) {
-           alert('로그인이 필요합니다.');
            router.push('/login');
            return;
          }
 
-         const response = await axiosInstance.post('/reviews', {
+         if (!title.trim() || !bookTitle.trim() || !content.trim()) {
+           setError('필수 입력 항목을 모두 작성해주세요.');
+           return;
+         }
+
+         const response = await axiosInstance.post('/api/reviews', {
            title,
            bookTitle,
-           publisher: publisher || '모름',
-           bookAuthor: bookAuthor || '모름',
-           content,
-           author: username,
+           publisher,
+           bookAuthor,
+           content
          }, {
-           headers: {
-             Authorization: `Bearer ${token}`,
-           },
+           headers: { Authorization: `Bearer ${token}` }
          });
 
          if (response.data.success) {
-           alert('리뷰가 성공적으로 등록되었습니다.');
-           router.push('/');
-         } else {
-           throw new Error(response.data.message || '리뷰 등록 실패');
+           router.push(`/${response.data.review.id}`);
          }
        } catch (error: any) {
-         console.error('리뷰 등록 오류:', error);
-         setError(error.response?.data?.message || '서버 오류로 리뷰를 생성할 수 없습니다.');
+         setError(error.response?.data?.message || '리뷰 등록에 실패했습니다.');
        }
-     }
+     };
 
      return (
        <div className="container mx-auto px-4 py-8">

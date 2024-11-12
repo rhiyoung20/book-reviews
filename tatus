@@ -1,0 +1,128 @@
+[1mdiff --git a/client/pages/signup.tsx b/client/pages/signup.tsx[m
+[1mindex 5b6871f..521ce7d 100644[m
+[1m--- a/client/pages/signup.tsx[m
+[1m+++ b/client/pages/signup.tsx[m
+[36m@@ -131,31 +131,17 @@[m [mexport default function SignupPage() {[m
+   }, [formData, isUsernameVerified]);[m
+ [m
+   // 회원가입 처리[m
+[31m-  const handleSubmit = async (e: React.FormEvent) => {[m
+[32m+[m[32m  const handleSignup = async (e: React.FormEvent) => {[m
+     e.preventDefault();[m
+[31m-    setErrors({});[m
+[31m-[m
+[32m+[m[41m    [m
+     try {[m
+[31m-      setIsLoading(true);[m
+[31m-[m
+[31m-      // 유효성 검사[m
+[31m-      if (!isUsernameVerified) {[m
+[31m-        alert('사용자명 중복 확인이 필요합니다.');[m
+[31m-        return;[m
+[31m-      }[m
+[31m-[m
+[32m+[m[32m      // 클라이언트 측 유효성 검사 강화[m
+       if (!isEmailVerified) {[m
+[31m-        alert('이메일 인증이 필요합니다.');[m
+[32m+[m[32m        setErrors(prev => ({ ...prev, email: '이메일 인증이 필요합니다.' }));[m
+         return;[m
+       }[m
+[31m-[m
+[31m-      if (formData.password !== formData.confirmPassword) {[m
+[31m-        setErrors(prev => ({ ...prev, confirmPassword: '비밀번호가 일치하지 않습니다.' }));[m
+[31m-        return;[m
+[31m-      }[m
+[31m-[m
+[31m-      // 회원가입 API 호출[m
+[31m-      const response = await axiosInstance.post('/auth/signup', {[m
+[32m+[m[41m      [m
+[32m+[m[32m      const response = await axiosInstance.post('/api/auth/signup', {[m
+         username: formData.username,[m
+         email: formData.email,[m
+         password: formData.password,[m
+[36m@@ -163,17 +149,10 @@[m [mexport default function SignupPage() {[m
+       });[m
+ [m
+       if (response.data.success) {[m
+[31m-        localStorage.removeItem('signupData');[m
+[31m-        alert('회원가입이 완료되었습니다.');[m
+[31m-        router.push('/login');[m
+[31m-      } else {[m
+[31m-        alert(response.data.message || '회원가입에 실패했습니다.');[m
+[32m+[m[32m        router.push('/login?registered=true');[m
+       }[m
+     } catch (error: any) {[m
+[31m-      console.error('Signup error:', error);[m
+[31m-      alert(error.response?.data?.message || '회원가입 처리 중 오류가 발생했습니다.');[m
+[31m-    } finally {[m
+[31m-      setIsLoading(false);[m
+[32m+[m[32m      setErrors(prev => ({ ...prev, signup: '회원가입 중 오류가 발생했습니다.' }));[m
+     }[m
+   };[m
+ [m
+[36m@@ -215,7 +194,7 @@[m [mexport default function SignupPage() {[m
+           </p>[m
+         </div>[m
+ [m
+[31m-        <form onSubmit={handleSubmit} className="space-y-6">[m
+[32m+[m[32m        <form onSubmit={handleSignup} className="space-y-6">[m
+           <div>[m
+             <Label htmlFor="username">사용자명 (한글)</Label>[m
+             <div className="flex gap-2">[m
+[1mdiff --git a/client/pages/write-review.tsx b/client/pages/write-review.tsx[m
+[1mindex bc6c4c6..abf690f 100644[m
+[1m--- a/client/pages/write-review.tsx[m
+[1m+++ b/client/pages/write-review.tsx[m
+[36m@@ -21,38 +21,36 @@[m [mimport { Button } from '@/components/ui/Button';[m
+ [m
+      const handleSubmit = async (e: React.FormEvent) => {[m
+        e.preventDefault();[m
+[32m+[m[41m       [m
+        try {[m
+          const token = localStorage.getItem('token');[m
+          if (!token) {[m
+[31m-           alert('로그인이 필요합니다.');[m
+            router.push('/login');[m
+            return;[m
+          }[m
+ [m
+[31m-         const response = await axiosInstance.post('/reviews', {[m
+[32m+[m[32m         if (!title.trim() || !bookTitle.trim() || !content.trim()) {[m
+[32m+[m[32m           setError('필수 입력 항목을 모두 작성해주세요.');[m
+[32m+[m[32m           return;[m
+[32m+[m[32m         }[m
+[32m+[m
+[32m+[m[32m         const response = await axiosInstance.post('/api/reviews', {[m
+            title,[m
+            bookTitle,[m
+[31m-           publisher: publisher || '모름',[m
+[31m-           bookAuthor: bookAuthor || '모름',[m
+[31m-           content,[m
+[31m-           author: username,[m
+[32m+[m[32m           publisher,[m
+[32m+[m[32m           bookAuthor,[m
+[32m+[m[32m           content[m
+          }, {[m
+[31m-           headers: {[m
+[31m-             Authorization: `Bearer ${token}`,[m
+[31m-           },[m
+[32m+[m[32m           headers: { Authorization: `Bearer ${token}` }[m
+          });[m
+ [m
+          if (response.data.success) {[m
+[31m-           alert('리뷰가 성공적으로 등록되었습니다.');[m
+[31m-           router.push('/');[m
+[31m-         } else {[m
+[31m-           throw new Error(response.data.message || '리뷰 등록 실패');[m
+[32m+[m[32m           router.push(`/${response.data.review.id}`);[m
+          }[m
+        } catch (error: any) {[m
+[31m-         console.error('리뷰 등록 오류:', error);[m
+[31m-         setError(error.response?.data?.message || '서버 오류로 리뷰를 생성할 수 없습니다.');[m
+[32m+[m[32m         setError(error.response?.data?.message || '리뷰 등록에 실패했습니다.');[m
+        }[m
+[31m-     }[m
+[32m+[m[32m     };[m
+ [m
+      return ([m
+        <div className="container mx-auto px-4 py-8">[m
