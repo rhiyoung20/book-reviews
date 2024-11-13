@@ -4,6 +4,7 @@ import prisma from '../lib/prisma';
 
 // 이메일 전송을 위한 transporter 설정
 const transporter = nodemailer.createTransport({
+  service: 'gmail',
   host: process.env.SMTP_HOST,
   port: Number(process.env.SMTP_PORT),
   secure: false,
@@ -56,7 +57,7 @@ export const sendVerificationEmail = async (email: string) => {
         <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
           <h2 style="color: #333; text-align: center;">책익는 마을 이메일 인증</h2>
           <p style="color: #666; line-height: 1.6;">
-            아래 링크를 클릭하여 이메일 인증을 완료해주세요.
+            아래 버튼을 클릭하여 이메일 인증을 완료해주세요.
           </p>
           <div style="text-align: center; margin: 30px 0;">
             <a href="${verificationUrl}" 

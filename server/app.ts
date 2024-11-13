@@ -1,12 +1,14 @@
 import express from 'express';
 import type { Express, Request, Response, NextFunction } from 'express-serve-static-core';
 import cors from 'cors';
-import { connectDB } from './config/database';
+import connectDB from './config/database';  // { connectDB }가 아닌 default import 사용
+import pool from './config/database';
 import config from './config/config';
 import authRoutes from './routes/auth';
 import reviewRoutes from './routes/reviews';
 import commentRoutes from './routes/comments';
 import userRoutes from './routes/users';
+import sequelize from './config/database';
 
 const app = express();
 
@@ -41,13 +43,14 @@ const PORT = Number(config.port) || 4000;
 
 const startServer = async () => {
   try {
-    await connectDB();
-    app.listen(PORT, '0.0.0.0', () => {
+    await sequelize.authenticate();
+    console.log('MySQL 연결 성공');
+    
+    app.listen(PORT, () => {
       console.log(`서버가 포트 ${PORT}에서 실행 중입니다.`);
-      console.log(`서버 주소: http://0.0.0.0:${PORT}`);
     });
   } catch (error) {
-    console.error('서버 시작 실패:', error);
+    console.error('MySQL 연결 실패:', error);
     process.exit(1);
   }
 };

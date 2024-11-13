@@ -1,4 +1,4 @@
-import { Review } from "../models";
+import Review from "../models/Review";
 
 export interface ReviewAttributes {
     id: number;

@@ -1,16 +1,23 @@
 import express from 'express';
 import type { Request, Response, NextFunction } from 'express-serve-static-core';
-import { User, Review, Comment } from '../models';
+import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import prisma from '../lib/prisma';
+import type { RequestWithUser } from '../middleware/auth';
 
 // 비밀번호 변경
-export const changePassword = async (req: Request, res: Response) => {
+export const changePassword = async (req: RequestWithUser, res: Response) => {
   try {
+    if (!req.user) {
+      return res.status(401).json({ message: '인증되지 않은 사용자입니다.' });
+    }
     const userId = req.user.id;
     const { currentPassword, newPassword } = req.body;
 
-    const user = await User.findByPk(userId);
+    const user = await prisma.user.findUnique({
+      where: { id: userId }
+    });
+    
     if (!user) {
       return res.status(404).json({ message: '사용자를 찾을 수 없습니다.' });
     }
@@ -23,7 +30,10 @@ export const changePassword = async (req: Request, res: Response) => {
 
     // 새 비밀번호 해싱 및 업데이트
     const hashedNewPassword = await bcrypt.hash(newPassword, 10);
-    await user.update({ password: hashedNewPassword });
+    await prisma.user.update({
+      where: { id: userId },
+      data: { password: hashedNewPassword }
+    });
 
     return res.json({ message: '비밀번호가 성공적으로 변경되었습니다.' });
   } catch (error) {
@@ -33,20 +43,25 @@ export const changePassword = async (req: Request, res: Response) => {
 };
 
 // 사용자의 리뷰 목록 조회
-export const getUserReviews = async (req: Request, res: Response) => {
+export const getUserReviews = async (req: RequestWithUser, res: Response) => {
   try {
-    const userId = req.user.id;
-    const reviews = await Review.findAll({
-      where: { userId },
-      attributes: [
-        'id', 
-        'title', 
-        'bookTitle',
-        'createdAt',
-        'views'
-      ],
-      order: [['createdAt', 'DESC']]
-    });
+    if (!req.user) {
+      return res.status(401).json({ message: '인증되지 않은 사용자입니다.' });
+    }
+
+    const userId = req.params.userId || req.user.id;
+
+    // 다른 사용자의 정보를 요청할 경우 관리자 권한 체크
+    if (userId !== req.user.id && req.user.isAdmin !== true) {
+      return res.status(403).json({ message: '권한이 없습니다.' });
+    }
+    
+    const reviews = await prisma.$queryRaw`
+      SELECT id, title, bookTitle, createdAt, views 
+      FROM Review 
+      WHERE userId = ${Number(userId)} 
+      ORDER BY createdAt DESC
+    `;
 
     return res.json({ reviews });
   } catch (error) {
@@ -55,22 +70,26 @@ export const getUserReviews = async (req: Request, res: Response) => {
 };
 
 // 사용자의 댓글 목록 조회
-export const getUserComments = async (req: Request, res: Response) => {
+export const getUserComments = async (req: RequestWithUser, res: Response) => {
   try {
-    const userId = req.user.id;
-    const comments = await Comment.findAll({
-      where: { userId },
-      attributes: [
-        'id', 
-        'content', 
-        'createdAt'
-      ],
-      include: [{
-        model: Review,
-        attributes: ['id', 'title']
-      }],
-      order: [['createdAt', 'DESC']]
-    });
+    if (!req.user) {
+      return res.status(401).json({ message: '인증되지 않은 사용자입니다.' });
+    }
+
+    const userId = req.params.userId || req.user.id;
+
+    // 다른 사용자의 정보를 요청할 경우 관리자 권한 체크
+    if (userId !== req.user.id && req.user.isAdmin !== true) {
+      return res.status(403).json({ message: '권한이 없습니다.' });
+    }
+    
+    const comments = await prisma.$queryRaw`
+      SELECT c.id, c.content, c.createdAt, r.id as reviewId, r.title as reviewTitle
+      FROM Comment c
+      JOIN Review r ON c.reviewId = r.id
+      WHERE c.userId = ${Number(userId)}
+      ORDER BY c.createdAt DESC
+    `;
 
     return res.json({ comments });
   } catch (error) {

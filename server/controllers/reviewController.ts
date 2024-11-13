@@ -1,15 +1,18 @@
 import express from 'express';
 import type { Express, Request, Response, NextFunction } from 'express-serve-static-core';
-import { Review, User } from '../models';
+import Review from '../models/Review';
+import User from '../models/User';
 import { Op } from 'sequelize';
+import type { ReviewAttributes } from '../models/Review';
 
-interface CustomRequest extends Omit<Request, 'user'> {
+export type CustomRequest = Request & {
   user?: {
     id: number;
     username: string;
-    isAdmin?: boolean;
+    isAdmin: boolean;
   };
-}
+};
+
 export const createReview = async (req: CustomRequest, res: Response) => {
   try {
     const { title, bookTitle, publisher, bookAuthor, content } = req.body;

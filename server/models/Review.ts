@@ -1,9 +1,19 @@
 import { Model, DataTypes } from 'sequelize';
 import sequelize from '../config/database';
-import User from '../models/User';
-import { ReviewAttributes } from './types';
 
-class Review extends Model<ReviewAttributes> {
+export interface ReviewAttributes {
+  id: number;
+  title: string;
+  bookTitle: string;
+  publisher: string;
+  bookAuthor: string;
+  content: string;
+  userId: number;
+  username: string;
+  views: number;
+}
+
+class Review extends Model<ReviewAttributes, ReviewAttributes> implements ReviewAttributes {
   public id!: number;
   public title!: string;
   public bookTitle!: string;
@@ -13,6 +23,9 @@ class Review extends Model<ReviewAttributes> {
   public userId!: number;
   public username!: string;
   public views!: number;
+
+  public readonly createdAt!: Date;
+  public readonly updatedAt!: Date;
 }
 
 Review.init({
@@ -52,13 +65,11 @@ Review.init({
   views: {
     type: DataTypes.INTEGER,
     defaultValue: 0
-  },
+  }
 }, {
   sequelize,
-  tableName: 'reviews'
+  tableName: 'reviews',
+  timestamps: true
 });
-
-Review.belongsTo(User, { foreignKey: 'userId' });
-User.hasMany(Review, { foreignKey: 'userId' });
 
 export default Review;

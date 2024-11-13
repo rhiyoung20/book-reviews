@@ -6,15 +6,21 @@ import config from '../config/config'
 declare global {
   namespace Express {
     interface Request {
-      user: any
+      user?: {
+        id: string | number;
+      };
     }
   }
 }
 
-interface UserPayload {
+export interface UserPayload {
   id: number;
   username: string;
   isAdmin?: boolean;
+}
+
+export interface RequestWithUser extends Request {
+  user: UserPayload;
 }
 
 export const verifyToken = (req: Request, res: Response, next: NextFunction) => {

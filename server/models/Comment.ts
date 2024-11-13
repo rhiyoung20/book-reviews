@@ -1,61 +1,64 @@
-import { Model, DataTypes } from 'sequelize';
-import sequelize from '../config/database';
-import User from './User';
-import { Review } from '../models';
+import pool from '../config/database';
 
-class Comment extends Model {
-  public id!: number;
-  public content!: string;
-  public userId!: number;
-  public reviewId!: number;
-  public parentId?: number;  // 대댓글을 위한 필드
-  public readonly createdAt!: Date;
-  public readonly updatedAt!: Date;
+export interface Comment {
+  id?: number;
+  content: string;
+  userId: number;
+  username?: string;
+  reviewId: number;
+  parentId?: number;
+  createdAt?: Date;
+  updatedAt?: Date;
 }
 
-Comment.init({
-  id: {
-    type: DataTypes.INTEGER,
-    autoIncrement: true,
-    primaryKey: true
-  },
-  content: {
-    type: DataTypes.TEXT,
-    allowNull: false
-  },
-  userId: {
-    type: DataTypes.INTEGER,
-    allowNull: false,
-    references: {
-      model: 'users',
-      key: 'id'
-    }
-  },
-  reviewId: {
-    type: DataTypes.INTEGER,
-    allowNull: false,
-    references: {
-      model: 'reviews',
-      key: 'id'
-    }
-  },
-  parentId: {
-    type: DataTypes.INTEGER,
-    allowNull: true,
-    references: {
-      model: 'comments',
-      key: 'id'
-    }
+export class CommentModel {
+  static async create(comment: Omit<Comment, 'id' | 'createdAt' | 'updatedAt' | 'username'>): Promise<Comment> {
+    const result = await pool.models.Comment.create({
+      content: comment.content,
+      userId: comment.userId,
+      reviewId: comment.reviewId,
+      parentId: comment.parentId
+    });
+    return result.toJSON();
   }
-}, {
-  sequelize,
-  modelName: 'Comment',
-  tableName: 'comments'
-});
 
-Comment.belongsTo(User, { foreignKey: 'userId' });
-Comment.belongsTo(Review, { foreignKey: 'reviewId' });
-User.hasMany(Comment, { foreignKey: 'userId' });
-Review.hasMany(Comment, { foreignKey: 'reviewId' });
+  static async findById(id: number): Promise<Comment | null> {
+    const comment = await pool.models.Comment.findOne({
+      include: [{
+        model: pool.models.User,
+        attributes: ['username']
+      }],
+      where: { id }
+    });
+    return comment?.toJSON() || null;
+  }
 
-export default Comment;
+  static async findByReviewId(reviewId: number): Promise<Comment[]> {
+    const comments = await pool.models.Comment.findAll({
+      include: [{
+        model: pool.models.User,
+        attributes: ['username']
+      }],
+      where: { reviewId },
+      order: [['createdAt', 'DESC']]
+    });
+    return comments.map(comment => comment.toJSON());
+  }
+
+  static async update(id: number, content: string): Promise<boolean> {
+    await pool.models.Comment.update(
+      { content },
+      { where: { id } }
+    );
+    return true;
+  }
+
+  static async delete(id: number): Promise<boolean> {
+    await pool.models.Comment.destroy({
+      where: { id }
+    });
+    return true;
+  }
+}
+
+export default CommentModel;

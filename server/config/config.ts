@@ -3,55 +3,31 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 interface Config {
-  port: number | string;
-  nodeEnv: string;
-  database: {
-    name: string;
-    username: string;
-    password: string;
-    host: string;
-  };
+  port: number;
   jwt: {
     secret: string;
-    expiresIn: string;
   };
-  email: {
-    host: string | undefined;
-    port: number;
-    user: string | undefined;
-    pass: string | undefined;
+  database: {
+    host: string;
+    user: string;
+    password: string;
+    name: string;
   };
-  aws: {
-    region: string | undefined;
-    accessKeyId: string | undefined;
-    secretAccessKey: string | undefined;
-  };
+  jwtSecret: string;
 }
 
 const config: Config = {
-  nodeEnv: process.env.NODE_ENV || 'development',
-  port: process.env.PORT || 4000,
-  database: {
-    name: process.env.DB_DATABASE || 'book_review',
-    username: process.env.DB_USERNAME || 'root',
-    password: process.env.DB_PASSWORD || 'Highting9103!',
-    host: process.env.DB_HOST || 'localhost'
-  },
+  port: Number(process.env.PORT) || 4000,
   jwt: {
-    secret: process.env.JWT_SECRET || 'your-secret-key',
-    expiresIn: process.env.JWT_EXPIRES_IN || '24h'
+    secret: process.env.JWT_SECRET || 'your-secret-key'
   },
-  email: {
-    host: process.env.SMTP_HOST,
-    port: parseInt(process.env.SMTP_PORT || '587'),
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS
+  database: {
+    host: process.env.DB_HOST || 'localhost',
+    user: process.env.DB_USER || 'root',
+    password: process.env.DB_PASSWORD || '',
+    name: process.env.DB_NAME || 'book_review'
   },
-  aws: {
-    region: process.env.AWS_REGION,
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY
-  }
+  jwtSecret: process.env.JWT_SECRET || 'your-default-secret-key'
 };
 
 export default config;

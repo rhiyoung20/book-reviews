@@ -8,6 +8,16 @@ import {
   updateComment,
   deleteComment
 } from '../controllers/commentController';
+import { User } from '../models/User';
+
+// RequestWithUser 타입을 여기서 직접 정의
+interface RequestWithUser extends Request {
+  user: {
+    id: number;
+    username: string;
+    isAdmin: boolean;
+  };
+}
 
 const router = Router();
 
@@ -23,39 +33,40 @@ router.get('/review/:reviewId', async (req: Request, res: Response, next: NextFu
 // 댓글 작성 (로그인 필요)
 router.post(
   '/review/:reviewId', 
-  verifyToken as express.RequestHandler, 
-  async (req: Request, res: Response, next: NextFunction) => {
+  verifyToken as express.RequestHandler,
+  (async (req, res: Response, next: NextFunction) => {
     try {
-      await createComment(req, res);
+      await createComment(req as RequestWithUser, res);
     } catch (error) {
       next(error);
     }
-  }
+  }) as express.RequestHandler
 );
 
 // 댓글 수정 (로그인 필요)
 router.put(
   '/:id', 
-  verifyToken as express.RequestHandler, 
-  async (req: Request, res: Response, next: NextFunction) => {
+  verifyToken as express.RequestHandler,
+  (async (req, res: Response, next: NextFunction) => {
     try {
-      await updateComment(req, res);
+      await updateComment(req as RequestWithUser, res);
     } catch (error) {
       next(error);
     }
-  }
+  }) as express.RequestHandler
 );
 
 // 댓글 삭제 (로그인 필요)
 router.delete(
   '/:id', 
-  verifyToken as express.RequestHandler, 
-  async (req: Request, res: Response, next: NextFunction) => {
+  verifyToken as express.RequestHandler,
+  (async (req, res: Response, next: NextFunction) => {
     try {
-      await deleteComment(req, res);
+      await deleteComment(req as RequestWithUser, res);
     } catch (error) {
       next(error);
     }
-  }
+  }) as express.RequestHandler
 );
+
 export default router;
