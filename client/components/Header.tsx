@@ -3,10 +3,10 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { Button } from './ui/Button';
 import { UserContext } from '@/context/UserContext';
-import axiosInstance from '../utils/axiosInstance';
+import axiosInstance from '../utils/axios';
 
 interface HeaderProps {
-  hideAuthButtons?: boolean;  // 로그인/회원가입 버튼 숨김 여부
+  hideAuthButtons?: boolean;
 }
 
 const Header = ({ hideAuthButtons = false }: HeaderProps) => {
@@ -15,30 +15,24 @@ const Header = ({ hideAuthButtons = false }: HeaderProps) => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   useEffect(() => {
-    // 로그인 상태 체크
-    const checkLoginStatus = async () => {
-      try {
-        const response = await axiosInstance.get('/auth/check');
-        setIsLoggedIn(response.data.isLoggedIn);
-        setUsername(response.data.username || '');
-      } catch (err) {
-        setIsLoggedIn(false);
-        setUsername('');
-      }
-    };
-
-    checkLoginStatus();
-  }, []);
+    // 로컬 스토리지에서 사용자 정보 확인
+    const storedUsername = localStorage.getItem('username');
+    const token = localStorage.getItem('token');
+    
+    if (storedUsername && token) {
+      setIsLoggedIn(true);
+      setUsername(storedUsername);
+    } else {
+      setIsLoggedIn(false);
+      setUsername('');
+    }
+  }, [setUsername]); // username이 변경될 때마다 실행
 
   const handleLogout = () => {
-    // 로컬 스토리지에서 토큰과 사용자 정보 제거
     localStorage.removeItem('token');
     localStorage.removeItem('username');
-    
-    // UserContext 상태 초기화
+    setIsLoggedIn(false);
     setUsername('');
-    
-    // 홈페이지로 리다이렉트
     router.push('/');
   };
 
@@ -52,17 +46,15 @@ const Header = ({ hideAuthButtons = false }: HeaderProps) => {
           
           {!hideAuthButtons && (
             <div className="flex items-center space-x-4">
-              {isLoggedIn ? (
+              {isLoggedIn && username ? (
                 <>
+                  <span className="text-gray-600">{username}님 환영합니다</span>
                   <Link href="/mypage">
-                    <span className="text-gray-600 hover:text-gray-900">
-                      {username}님
-                    </span>
+                    <Button variant="outline">마이 페이지</Button>
                   </Link>
                   <Button 
                     variant="ghost" 
                     onClick={handleLogout}
-                    className="text-gray-600 hover:text-gray-900"
                   >
                     로그아웃
                   </Button>

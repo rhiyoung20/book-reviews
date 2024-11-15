@@ -29,12 +29,9 @@ import { Button } from '@/components/ui/Button';
            return;
          }
 
-         if (!title.trim() || !bookTitle.trim() || !content.trim()) {
-           setError('필수 입력 항목을 모두 작성해주세요.');
-           return;
-         }
+         console.log('전송할 데이터:', { title, bookTitle, publisher, bookAuthor, content });
 
-         const response = await axiosInstance.post('/api/reviews', {
+         const response = await axiosInstance.post('/reviews', {
            title,
            bookTitle,
            publisher,
@@ -44,10 +41,13 @@ import { Button } from '@/components/ui/Button';
            headers: { Authorization: `Bearer ${token}` }
          });
 
+         console.log('서버 응답:', response.data);
+
          if (response.data.success) {
            router.push(`/${response.data.review.id}`);
          }
        } catch (error: any) {
+         console.error('리뷰 등록 오류:', error);
          setError(error.response?.data?.message || '리뷰 등록에 실패했습니다.');
        }
      };

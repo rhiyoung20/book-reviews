@@ -11,6 +11,12 @@ const sequelize = new Sequelize(
     host: process.env.DB_HOST,
     port: Number(process.env.DB_PORT),
     dialect: 'mysql',
+    dialectOptions: {
+      ssl: {
+        require: true,
+        rejectUnauthorized: false  // 개발 환경에서는 self-signed 인증서 허용
+      }
+    }
   }
 );
 

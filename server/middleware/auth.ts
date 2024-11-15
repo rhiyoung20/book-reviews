@@ -31,10 +31,11 @@ export const verifyToken = (req: Request, res: Response, next: NextFunction) => 
   }
 
   try {
-    const decoded = jwt.verify(token, config.jwt.secret)
+    const JWT_SECRET = process.env.JWT_SECRET || 'ptgoras916=25';
+    const decoded = jwt.verify(token, JWT_SECRET);
     
     // 토큰의 만료 시간 확인
-    const tokenExp = (decoded as any).exp * 1000 // JWT exp는 초 단위
+    const tokenExp = (decoded as any).exp * 1000
     if (Date.now() >= tokenExp) {
       return res.status(401).json({ 
         message: '토큰이 만료되었습니다.',
@@ -45,6 +46,7 @@ export const verifyToken = (req: Request, res: Response, next: NextFunction) => 
     req.user = decoded as UserPayload;
     next()
   } catch (error) {
+    console.error('토큰 검증 오류:', error);
     if (error instanceof jwt.TokenExpiredError) {
       return res.status(401).json({ 
         message: '토큰이 만료되었습니다.',

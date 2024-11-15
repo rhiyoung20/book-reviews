@@ -76,7 +76,6 @@ export const sendVerificationEmail = async (email: string) => {
         </div>
       `
     };
-
     // 이메일 발송
     const info = await transporter.sendMail(mailOptions);
 
@@ -86,4 +85,4 @@ export const sendVerificationEmail = async (email: string) => {
     console.error('Email sending error:', error); // 상세 에러 로깅
     throw error;
   }
-};
+}

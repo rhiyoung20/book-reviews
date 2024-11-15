@@ -3,7 +3,6 @@ import type { Express, Request, Response, NextFunction } from 'express-serve-sta
 import Review from '../models/Review';
 import User from '../models/User';
 import { Op } from 'sequelize';
-import type { ReviewAttributes } from '../models/Review';
 
 export type CustomRequest = Request & {
   user?: {
@@ -15,43 +14,30 @@ export type CustomRequest = Request & {
 
 export const createReview = async (req: CustomRequest, res: Response) => {
   try {
-    const { title, bookTitle, publisher, bookAuthor, content } = req.body;
-    const userId = req.user?.id;
     const username = req.user?.username;
-
-    // 필수 필드 검증
-    if (!title?.trim() || !bookTitle?.trim()) {
-      return res.status(400).json({ 
-        message: '제목과 도서명은 필수 입력 항목입니다.' 
-      });
-    }
-
-    if (!userId || !username) {
+    
+    if (!username) {
       return res.status(401).json({
-        message: '로그인이 필요합니다.'
+        success: false,
+        message: '인증이 필요합니다.'
       });
     }
 
     const review = await Review.create({
-      id: 0,
-      title,
-      bookTitle,
-      publisher: publisher?.trim() || '미입력',
-      bookAuthor: bookAuthor?.trim() || '미입력',
-      content,
-      userId,
+      ...req.body,
       username,
       views: 0
     });
 
-    return res.status(201).json({
-      message: '리뷰가 성공적으로 등록되었습니다.',
+    res.status(201).json({
+      success: true,
       review
     });
   } catch (error) {
     console.error('리뷰 생성 오류:', error);
-    return res.status(500).json({ 
-      message: '리뷰 등록 중 오류가 발생했습니다.' 
+    res.status(500).json({
+      success: false,
+      message: '리뷰 생성 중 오류가 발생했습니다.'
     });
   }
 };
@@ -130,7 +116,7 @@ export const updateReview = async (req: CustomRequest, res: Response) => {
   try {
     const { id } = req.params;
     const { title, bookTitle, publisher, bookAuthor, content } = req.body;
-    const userId = req.user?.id;
+    const username = req.user?.username;
 
     // 필수 필드 검증
     if (!title?.trim() || !bookTitle?.trim()) {
@@ -148,7 +134,7 @@ export const updateReview = async (req: CustomRequest, res: Response) => {
     }
 
     // 작성자 본인만 수정 가능
-    if (review.userId !== userId) {
+    if (review.username !== username) {
       return res.status(403).json({ 
         message: '리뷰 수정 권한이 없습니다.' 
       });
@@ -177,7 +163,7 @@ export const updateReview = async (req: CustomRequest, res: Response) => {
 export const deleteReview = async (req: CustomRequest, res: Response) => {
   try {
     const { id } = req.params;
-    const userId = req.user?.id;
+    const username = req.user?.username;
     const isAdmin = req.user?.isAdmin;
 
     const review = await Review.findByPk(id);
@@ -189,7 +175,7 @@ export const deleteReview = async (req: CustomRequest, res: Response) => {
     }
 
     // 작성자 본인 또는 관리자만 삭제 가능
-    if (review.userId !== userId && !isAdmin) {
+    if (review.username !== username && !isAdmin) {
       return res.status(403).json({ 
         message: '리뷰 삭제 권한이 없습니다.' 
       });

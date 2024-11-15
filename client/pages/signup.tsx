@@ -25,48 +25,68 @@ export default function SignupPage() {
   const [isUsernameVerified, setIsUsernameVerified] = useState(false)
   const [isEmailSending, setIsEmailSending] = useState(false)
   const [emailVerificationMessage, setEmailVerificationMessage] = useState('')
+  const [passwordError, setPasswordError] = useState<string>('');
+
+  // 초기 상태값 설정
+  const initialFormState = {
+    username: '',
+    email: '',
+    password: '',
+    confirmPassword: '',
+    phone: ''
+  };
+
+  // 컴포넌트 마운트 시 초기화
+  useEffect(() => {
+    setFormData(initialFormState);
+    setIsUsernameVerified(false);
+    setIsEmailVerified(false);
+    setErrors({});
+  }, []);
 
   // 사용자명 중복 체크 - 타임아웃 추가
   const checkUsername = async () => {
     try {
+      setIsCheckingUsername(true);  // 로딩 상태 시작
       console.log('Checking username:', formData.username); // 디버깅용
+
       const response = await axiosInstance.post('/auth/check-username', {
         username: formData.username
       });
+      
       console.log('Server response:', response.data); // 디버깅용
       
-      alert(response.data.message);
-      setIsUsernameVerified(response.data.available);
+      if (response.data.success) {
+        if (response.data.exists) {
+          alert('이미 사용 중인 사용자명입니다.');
+          setIsUsernameVerified(false);
+        } else {
+          alert('사용 가능한 사용자명입니다.');
+          setIsUsernameVerified(true);
+        }
+      }
     } catch (error: any) {
-      console.error('Username check error:', error); // 디버깅용
-      console.error('Error response:', error.response); // 디버깅용
-      alert(error.response?.data?.message || '사용자명 확인 중 오류가 발생했습니다.');
+      console.error('Username check error:', error);
+      alert('사용자명 확인 중 오류가 발생했습니다.');
       setIsUsernameVerified(false);
+    } finally {
+      setIsCheckingUsername(false);  // 로딩 상태 종료
     }
   };
 
-  // 이메일 인증 메일 발송
+  // 이메일 인증 요청
   const handleEmailVerification = async () => {
-    if (!formData.email) {
-      alert('이메일을 입력해주세요.');
-      return;
-    }
-
     try {
-      setIsEmailSending(true);
-      const response = await axiosInstance.post('/auth/send-verification', {
+      const response = await axiosInstance.post('http://localhost:4000/api/auth/send-verification', {
         email: formData.email
       });
       
-      alert('인증 이메일이 발송되었습니다. 이메일을 확인해주세요.');
-      
-      // 이메일 발송 후 상태 업데이트
-      setIsEmailSent(true);
-    } catch (error: any) {
-      console.error('Email verification error:', error);
-      alert(error.response?.data?.message || '이메일 발송에 실패했습니다.');
-    } finally {
-      setIsEmailSending(false);
+      if (response.data.success) {
+        alert('인증 이메일이 발송되었습니다. 이메일을 확인해주세요.');
+      }
+    } catch (error) {
+      console.error('이메일 발송 오류:', error);
+      alert('이메일 발송 중 오류가 발생했습니다.');
     }
   };
 
@@ -130,18 +150,26 @@ export default function SignupPage() {
     }));
   }, [formData, isUsernameVerified]);
 
-  // 회원가입 처리
-  const handleSignup = async (e: React.FormEvent) => {
+  // handleSubmit 함수
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     try {
-      // 클라이언트 측 유효성 검사 강화
-      if (!isEmailVerified) {
-        setErrors(prev => ({ ...prev, email: '이메일 인증이 필요합니다.' }));
+      setIsLoading(true);
+      
+      // 클라이언트 측 유효성 검사
+      if (!isUsernameVerified || !isEmailVerified) {
+        alert('사용자명 중복 확인과 이메일 인증이 필요합니다.');
         return;
       }
-      
-      const response = await axiosInstance.post('/api/auth/signup', {
+
+      // 비밀번호 확인
+      if (formData.password !== formData.confirmPassword) {
+        alert('비밀번호가 일치하지 않습니다.');
+        return;
+      }
+
+      const response = await axiosInstance.post('/auth/signup', {
         username: formData.username,
         email: formData.email,
         password: formData.password,
@@ -149,10 +177,16 @@ export default function SignupPage() {
       });
 
       if (response.data.success) {
-        router.push('/login?registered=true');
+        alert('회원가입이 완료되었습니다.');
+        // 로컬 스토리지의 임시 데이터 삭제
+        localStorage.removeItem('signupData');
+        router.push('/login');
       }
     } catch (error: any) {
-      setErrors(prev => ({ ...prev, signup: '회원가입 중 오류가 발생했습니다.' }));
+      console.error('회원가입 오류:', error);
+      alert(error.response?.data?.message || '회원가입 중 오류가 발생했습니다.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -183,6 +217,20 @@ export default function SignupPage() {
     }
   }, []);
 
+  const handleConfirmPasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const confirmValue = e.target.value;
+    setFormData(prev => ({
+      ...prev,
+      confirmPassword: confirmValue
+    }));
+    
+    if (formData.password !== confirmValue) {
+      setPasswordError('입력한 비밀번호와 다릅니다.');
+    } else {
+      setPasswordError('');
+    }
+  };
+
   return (
     <div className="container mx-auto px-4 py-8">
       <Header hideAuthButtons={true} />
@@ -194,7 +242,7 @@ export default function SignupPage() {
           </p>
         </div>
 
-        <form onSubmit={handleSignup} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-6">
           <div>
             <Label htmlFor="username">사용자명 (한글)</Label>
             <div className="flex gap-2">
@@ -220,13 +268,7 @@ export default function SignupPage() {
                 {isCheckingUsername ? '확인 중...' : '중복 확인'}
               </Button>
             </div>
-            <div className="mt-4 mb-2 text-sm text-gray-600">
-              * 이메일 인증 방법:
-              <ol className="list-decimal ml-5 mt-1">
-                <li>이메일 주소 입력 후 '인증코드 받기' 클릭</li>
-                <li>테스트용 인증 코드: 123456</li>
-                <li>인증 코드 입력 후 '확인' 클릭</li>
-              </ol>
+            <div className="mt-4 mb-2 text-sm text-gray-600">              
             </div>
             {errors.username && (
               <p className="text-red-500 text-sm mt-1">{errors.username}</p>
@@ -289,14 +331,11 @@ export default function SignupPage() {
               id="confirmPassword"
               type="password"
               value={formData.confirmPassword}
-              onChange={(e) => setFormData(prev => ({
-                ...prev,
-                confirmPassword: e.target.value
-              }))}
+              onChange={handleConfirmPasswordChange}
               required
             />
-            {errors.confirmPassword && (
-              <p className="text-red-500 text-sm mt-1">{errors.confirmPassword}</p>
+            {passwordError && (
+              <p className="text-red-500 text-sm mt-1">{passwordError}</p>
             )}
           </div>
 

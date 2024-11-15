@@ -9,6 +9,10 @@ import reviewRoutes from './routes/reviews';
 import commentRoutes from './routes/comments';
 import userRoutes from './routes/users';
 import sequelize from './config/database';
+import session from 'express-session';
+import { createClient } from 'redis';
+import connectRedis from 'connect-redis';
+
 
 const app = express();
 
@@ -22,6 +26,35 @@ app.use(cors({
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Redis 클라이언트 설정
+const redisClient = createClient({
+    url: process.env.REDIS_URL || 'redis://localhost:6379'
+});
+
+// Redis 연결 에러 로깅
+redisClient.on('error', err => console.log('Redis Client Error', err));
+
+// Redis 연결
+redisClient.connect().catch(console.error);
+
+// RedisStore 설정
+const RedisStore = connectRedis(session);
+
+// 세션 설정
+app.use(session({
+    secret: process.env.SESSION_SECRET || 'ptgoras916=25',
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+        secure: process.env.NODE_ENV === 'production',
+        maxAge: 1000 * 60 * 60 * 24 * 30,
+        httpOnly: true
+    },
+    store: new RedisStore({ 
+        client: redisClient as any
+    })
+}));
 
 // 라우트 설정
 app.use('/api/auth', authRoutes);
