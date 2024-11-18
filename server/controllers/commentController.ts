@@ -1,147 +1,138 @@
-import express from 'express';
-import type { Request, Response } from 'express-serve-static-core';
-import { CommentModel } from '../models/Comment';
-import { UserModel } from '../models/User';
+import { Request, Response } from 'express';
+import Comment, { CommentCreationAttributes } from '../models/Comment';
+import { CustomRequest } from '../middleware/auth';
 
-interface RequestWithUser extends Request {
-  user?: {
-    id: number;
-    username: string;
-    isAdmin: boolean;
-  }
-}
-
-// 리뷰의 댓글 목록 조회
-export const getReviewComments = async (req: Request, res: Response) => {
+export const createComment = async (req: CustomRequest, res: Response) => {
   try {
-    const reviewId = parseInt(req.params.reviewId);
-    const comments = await CommentModel.findByReviewId(reviewId);
-    return res.json({ comments });
-  } catch (error) {
-    console.error('댓글 목록 조회 오류:', error);
-    return res.status(500).json({ 
-      message: '댓글 목록을 불러오는 중 오류가 발생했습니다.' 
-    });
-  }
-};
-
-// 댓글 작성
-export const createComment = async (req: RequestWithUser, res: Response) => {
-  try {
-    if (!req.user) {
-      return res.status(401).json({ message: '로그인이 필요합니다.' });
-    }
-
-    const reviewId = parseInt(req.params.reviewId);
     const { content, parentId } = req.body;
-    const userId = req.user.id;
+    const { reviewId } = req.params;
+    const username = req.user?.username;
 
-    if (!content?.trim()) {
-      return res.status(400).json({ 
-        message: '댓글 내용을 입력해주세요.' 
+    if (!username) {
+      return res.status(401).json({
+        success: false,
+        message: '인증이 필요합니다.'
       });
     }
 
-    const comment = await CommentModel.create({
+    const comment = await Comment.create({
       content,
-      userId,
-      reviewId,
-      parentId: parentId || null
-    });
+      username,
+      reviewId: parseInt(reviewId),
+      parentId: parentId ? parseInt(parentId) : null
+    } as CommentCreationAttributes);
 
-    if (!comment.id) {
-      throw new Error('댓글 생성 실패');
-    }
-
-    const commentWithUser = await CommentModel.findById(comment.id);
-
-    return res.status(201).json({
-      message: '댓글이 등록되었습니다.',
-      comment: commentWithUser
+    res.status(201).json({
+      success: true,
+      comment
     });
   } catch (error) {
-    console.error('댓글 작성 오류:', error);
-    return res.status(500).json({ 
-      message: '댓글 등록 중 오류가 발생했습니다.' 
+    console.error('댓글 생성 오류:', error);
+    res.status(500).json({
+      success: false,
+      message: '댓글 생성에 실패했습니다.'
     });
   }
 };
 
-// 댓글 수정
-export const updateComment = async (req: RequestWithUser, res: Response) => {
+export const getComments = async (req: Request, res: Response) => {
   try {
-    if (!req.user) {
-      return res.status(401).json({ message: '로그인이 필요합니다.' });
-    }
+    const { reviewId } = req.params;
+    const comments = await Comment.findAll({
+      where: { reviewId: parseInt(reviewId) },
+      order: [['createdAt', 'ASC']]
+    });
 
-    const id = parseInt(req.params.id);
-    const { content } = req.body;
-    const userId = req.user.id;
-
-    const comment = await CommentModel.findById(id);
-
-    if (!comment) {
-      return res.status(404).json({ 
-        message: '댓글을 찾을 수 없습니다.' 
-      });
-    }
-
-    if (comment.userId !== userId) {
-      return res.status(403).json({ 
-        message: '댓글 수정 권한이 없습니다.' 
-      });
-    }
-
-    await CommentModel.update(id, content);
-
-    const updatedComment = await CommentModel.findById(id);
-
-    return res.json({ 
-      message: '댓글이 수정되었습니다.',
-      comment: updatedComment
+    res.json({
+      success: true,
+      comments
     });
   } catch (error) {
-    console.error('댓글 수정 오류:', error);
-    return res.status(500).json({ 
-      message: '댓글 수정 중 오류가 발생했습니다.' 
+    console.error('댓글 조회 오류:', error);
+    res.status(500).json({
+      success: false,
+      message: '댓글을 불러오는데 실패했습니다.'
     });
   }
 };
 
-// 댓글 삭제
-export const deleteComment = async (req: RequestWithUser, res: Response) => {
+export const deleteComment = async (req: CustomRequest, res: Response) => {
   try {
-    if (!req.user) {
-      return res.status(401).json({ message: '로그인이 필요합니다.' });
-    }
+    const { id, reviewId } = req.params;
+    const username = req.user?.username;
 
-    const id = parseInt(req.params.id);
-    const userId = req.user.id;
-    const isAdmin = req.user.isAdmin;
-
-    const comment = await CommentModel.findById(id);
+    const comment = await Comment.findOne({
+      where: { 
+        id: parseInt(id),
+        reviewId: parseInt(reviewId)
+      }
+    });
 
     if (!comment) {
-      return res.status(404).json({ 
-        message: '댓글을 찾을 수 없습니다.' 
+      return res.status(404).json({
+        success: false,
+        message: '댓글을 찾을 수 없습니다.'
       });
     }
 
-    if (comment.userId !== userId && !isAdmin) {
-      return res.status(403).json({ 
-        message: '댓글 삭제 권한이 없습니다.' 
+    if (comment.username !== username) {
+      return res.status(403).json({
+        success: false,
+        message: '댓글을 삭제할 권한이 없습니다.'
       });
     }
 
-    await CommentModel.delete(id);
+    await comment.destroy();
 
-    return res.json({ 
-      message: '댓글이 삭제되었습니다.' 
+    res.json({
+      success: true,
+      message: '댓글이 삭제되었습니다.'
     });
   } catch (error) {
     console.error('댓글 삭제 오류:', error);
-    return res.status(500).json({ 
-      message: '댓글 삭제 중 오류가 발생했습니다.' 
+    res.status(500).json({
+      success: false,
+      message: '댓글 삭제에 실패했습니다.'
+    });
+  }
+};
+
+export const updateComment = async (req: CustomRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { content } = req.body;
+    const username = req.user?.username;
+
+    const comment = await Comment.findOne({
+      where: { id: parseInt(id) }
+    });
+
+    if (!comment) {
+      return res.status(404).json({
+        success: false,
+        message: '댓글을 찾을 수 없습니다.'
+      });
+    }
+
+    if (comment.username !== username) {
+      return res.status(403).json({
+        success: false,
+        message: '댓글을 수정할 권한이 없습니다.'
+      });
+    }
+
+    comment.content = content;
+    await comment.save();
+
+    res.json({
+      success: true,
+      comment
+    });
+  } catch (error) {
+    console.error('댓글 수정 오류:', error);
+    res.status(500).json({
+      success: false,
+      message: '댓글 수정에 실패했습니다.'
     });
   }
 };
