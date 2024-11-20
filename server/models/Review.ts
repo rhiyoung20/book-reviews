@@ -82,6 +82,15 @@ Review.init(
     modelName: 'Review',
     tableName: 'reviews',  // 테이블 이름 명시
     timestamps: true,      // createdAt, updatedAt 자동 관리
+    defaultScope: {
+      order: [['createdAt', 'DESC']] // 기본 정렬 순서를 DESC로 설정
+    },
+    scopes: {
+      // 추가적인 scope가 필요한 경우를 위해
+      withoutOrder: {
+        order: undefined
+      }
+    }
   }
 );
 

@@ -5,8 +5,10 @@ import {
   getReview,
   updateReview,
   deleteReview,
-  getReviews
+  getReviews,
+  CustomRequest
 } from '../controllers/reviewController';
+import { createComment, getComments } from '../controllers/commentController';
 
 const router = express.Router();
 
@@ -31,7 +33,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
 // 리뷰 조회 (로그인 불필요)
 router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    await getReview(req, res);
+    await getReview(req as CustomRequest, res);
   } catch (error) {
     next(error);
   }
@@ -73,6 +75,15 @@ router.delete('/admin/:id',
   verifyToken as RequestHandler,
   (req, res, next) => {
     deleteReview(req as AuthRequest, res).catch(next);
+  }
+);
+
+// 댓글 관련 라우트 추가
+router.get('/:reviewId/comments', getComments);
+router.post('/:reviewId/comments', 
+  verifyToken as RequestHandler,
+  (req, res, next) => {
+    createComment(req as AuthRequest, res).catch(next);
   }
 );
 
