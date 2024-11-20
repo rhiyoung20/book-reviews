@@ -60,3 +60,11 @@ export const verifyToken = (req: Request, res: Response, next: NextFunction) => 
     })
   }
 } 
+
+export interface CustomRequest extends Request {
+  user?: {
+    id: number;
+    username: string;
+    isAdmin?: boolean;
+  };
+} 

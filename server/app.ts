@@ -10,8 +10,8 @@ import commentRoutes from './routes/comments';
 import userRoutes from './routes/users';
 import sequelize from './config/database';
 import session from 'express-session';
+import RedisStore from 'connect-redis'
 import { createClient } from 'redis';
-import connectRedis from 'connect-redis';
 
 
 const app = express();
@@ -38,9 +38,6 @@ redisClient.on('error', err => console.log('Redis Client Error', err));
 // Redis 연결
 redisClient.connect().catch(console.error);
 
-// RedisStore 설정
-const RedisStore = connectRedis(session);
-
 // 세션 설정
 app.use(session({
     secret: process.env.SESSION_SECRET || 'ptgoras916=25',
@@ -51,15 +48,15 @@ app.use(session({
         maxAge: 1000 * 60 * 60 * 24 * 30,
         httpOnly: true
     },
-    store: new RedisStore({ 
-        client: redisClient as any
+    store: new (RedisStore as any)({ 
+        client: redisClient
     })
 }));
 
 // 라우트 설정
 app.use('/api/auth', authRoutes);
 app.use('/api/reviews', reviewRoutes);
-app.use('/api/comments', commentRoutes);
+app.use('/api/reviews', commentRoutes);
 app.use('/users', userRoutes);
 
 // 에러 핸들링

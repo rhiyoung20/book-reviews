@@ -22,6 +22,8 @@ export const createComment = async (req: CustomRequest, res: Response) => {
       parentId: parentId ? parseInt(parentId) : null
     } as CommentCreationAttributes);
 
+    console.log('댓글 생성 성공:', comment);
+
     res.status(201).json({
       success: true,
       comment

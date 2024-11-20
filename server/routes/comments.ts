@@ -10,10 +10,10 @@ import {
 } from '../controllers/commentController';
 import { CustomRequest } from '../middleware/auth';
 
-const router = Router();
+const router = express.Router();
 
 // 리뷰의 댓글 목록 조회 (로그인 불필요)
-router.get('/reviews/:reviewId/comments', async (req: Request, res: Response, next: NextFunction) => {
+router.get('/:reviewId/comments', async (req: Request, res: Response, next: NextFunction) => {
   try {
     await getComments(req as CustomRequest, res);
   } catch (error) {
@@ -23,7 +23,7 @@ router.get('/reviews/:reviewId/comments', async (req: Request, res: Response, ne
 
 // 댓글 작성 (로그인 필요)
 router.post(
-  '/reviews/:reviewId/comments', 
+  '/:reviewId/comments', 
   verifyToken as express.RequestHandler,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -36,7 +36,7 @@ router.post(
 
 // 댓글 수정 (로그인 필요)
 router.put(
-  '/reviews/:reviewId/comments/:id', 
+  '/:reviewId/comments/:id', 
   verifyToken as express.RequestHandler,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -49,7 +49,7 @@ router.put(
 
 // 댓글 삭제 (로그인 필요)
 router.delete(
-  '/reviews/:reviewId/comments/:id', 
+  '/:reviewId/comments/:id', 
   verifyToken as express.RequestHandler, 
   async (req: Request, res: Response, next: NextFunction) => {
     try {
