@@ -3,10 +3,10 @@ import type { Request, Response, NextFunction } from 'express-serve-static-core'
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import prisma from '../lib/prisma';
-import type { RequestWithUser } from '../middleware/auth';
+import type { CustomRequest } from '../middleware/auth';
 
 // 비밀번호 변경
-export const changePassword = async (req: RequestWithUser, res: Response) => {
+export const changePassword = async (req: CustomRequest, res: Response) => {
   try {
     if (!req.user) {
       return res.status(401).json({ message: '인증되지 않은 사용자입니다.' });
@@ -43,7 +43,7 @@ export const changePassword = async (req: RequestWithUser, res: Response) => {
 };
 
 // 사용자의 리뷰 목록 조회
-export const getUserReviews = async (req: RequestWithUser, res: Response) => {
+export const getUserReviews = async (req: CustomRequest, res: Response, next: NextFunction) => {
   try {
     if (!req.user) {
       return res.status(401).json({ message: '인증되지 않은 사용자입니다.' });
@@ -70,7 +70,7 @@ export const getUserReviews = async (req: RequestWithUser, res: Response) => {
 };
 
 // 사용자의 댓글 목록 조회
-export const getUserComments = async (req: RequestWithUser, res: Response) => {
+export const getUserComments = async (req: CustomRequest, res: Response) => {
   try {
     if (!req.user) {
       return res.status(401).json({ message: '인증되지 않은 사용자입니다.' });

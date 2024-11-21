@@ -24,10 +24,10 @@ router.get('/:reviewId/comments', async (req: Request, res: Response, next: Next
 // 댓글 작성 (로그인 필요)
 router.post(
   '/:reviewId/comments', 
-  verifyToken as express.RequestHandler,
-  async (req: Request, res: Response, next: NextFunction) => {
+  verifyToken,
+  async (req: CustomRequest, res: Response, next: NextFunction) => {
     try {
-      await createComment(req as CustomRequest, res);
+      await createComment(req, res);
     } catch (error) {
       next(error);
     }
@@ -37,7 +37,7 @@ router.post(
 // 댓글 수정 (로그인 필요)
 router.put(
   '/:reviewId/comments/:id', 
-  verifyToken as express.RequestHandler,
+  verifyToken,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       await updateComment(req as CustomRequest, res);
@@ -50,7 +50,7 @@ router.put(
 // 댓글 삭제 (로그인 필요)
 router.delete(
   '/:reviewId/comments/:id', 
-  verifyToken as express.RequestHandler, 
+  verifyToken, 
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       await deleteComment(req as CustomRequest, res);

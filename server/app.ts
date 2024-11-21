@@ -12,7 +12,16 @@ import sequelize from './config/database';
 import session from 'express-session';
 import RedisStore from 'connect-redis'
 import { createClient } from 'redis';
+import dotenv from 'dotenv';
 
+dotenv.config();
+
+// 환경 변수 출력 (디버깅 용도)
+console.log('Environment Variables:');
+console.log('ADMIN_USERNAME:', process.env.ADMIN_USERNAME);
+console.log('ADMIN_PASSWORD:', process.env.ADMIN_PASSWORD);
+console.log('JWT_SECRET:', process.env.JWT_SECRET);
+console.log('SESSION_SECRET:', process.env.SESSION_SECRET);
 
 const app = express();
 

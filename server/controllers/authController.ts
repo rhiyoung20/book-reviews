@@ -19,6 +19,34 @@ export const login = async (req: Request, res: Response) => {
   try {
     const { email, password } = req.body;
 
+    // 관리자 계정 확인 추가
+    const isAdminLogin = email === process.env.ADMIN_USERNAME && 
+                        password === process.env.ADMIN_PASSWORD;
+
+    if (isAdminLogin) {
+      // 관리자 로그인 처리
+      const token = jwt.sign(
+        { 
+          id: 0, // 관리자 특별 ID
+          username: 'admin',
+          isAdmin: true 
+        },
+        config.jwtSecret,
+        { expiresIn: '1d' }
+      );
+
+      return res.json({
+        success: true,
+        token,
+        user: {
+          id: 0,
+          username: 'admin',
+          email: process.env.ADMIN_USERNAME,
+          isAdmin: true
+        }
+      });
+    }
+
     // 사용자 조회
     const [user] = await sequelize.query(
       'SELECT * FROM users WHERE email = ?',

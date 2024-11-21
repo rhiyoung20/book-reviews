@@ -62,6 +62,7 @@ export const deleteComment = async (req: CustomRequest, res: Response) => {
   try {
     const { id, reviewId } = req.params;
     const username = req.user?.username;
+    const isAdmin = req.user?.isAdmin;
 
     const comment = await Comment.findOne({
       where: { 
@@ -77,7 +78,7 @@ export const deleteComment = async (req: CustomRequest, res: Response) => {
       });
     }
 
-    if (comment.username !== username) {
+    if (comment.username !== username && !isAdmin) {
       return res.status(403).json({
         success: false,
         message: '댓글을 삭제할 권한이 없습니다.'

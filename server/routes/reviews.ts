@@ -1,12 +1,12 @@
 import express, { Request, Response, NextFunction, RequestHandler } from 'express';
 import { verifyToken } from '../middleware/auth';
+import { CustomRequest } from '../middleware/auth';
 import {
   createReview,
   getReview,
   updateReview,
   deleteReview,
-  getReviews,
-  CustomRequest
+  getReviews,  
 } from '../controllers/reviewController';
 import { createComment, getComments } from '../controllers/commentController';
 
@@ -42,8 +42,8 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
 // 리뷰 작성 (로그인 필요)
 router.post('/', 
   verifyToken as RequestHandler,
-  (req, res, next) => {
-    createReview(req as AuthRequest, res).catch(next);
+  (req: CustomRequest, res, next) => {
+    createReview(req, res).catch(next);
   }
 );
 

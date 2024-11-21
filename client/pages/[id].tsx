@@ -31,13 +31,15 @@ interface Comment {
 const ReviewDetail: React.FC = () => {
   const router = useRouter();
   const { id } = router.query;
-  const { username } = useContext(UserContext);
+  const { username, isAdmin } = useContext(UserContext);
   const [review, setReview] = useState<IReview | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState('');
   const [replyTo, setReplyTo] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [editingCommentId, setEditingCommentId] = useState<number | null>(null);
+  const [editContent, setEditContent] = useState('');
 
   useEffect(() => {
     if (!id) return;
@@ -127,6 +129,53 @@ const ReviewDetail: React.FC = () => {
     }
   };
 
+  const handleCommentEdit = async (commentId: number) => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        setError('로그인이 필요합니다.');
+        return;
+      }
+
+      await axiosInstance.put(
+        `/reviews/${id}/comments/${commentId}`,
+        { content: editContent },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      setEditingCommentId(null);
+      setEditContent('');
+      await fetchComments();
+    } catch (err: any) {
+      console.error('댓글 수정 실패:', err);
+      setError(err.response?.data?.message || '댓글 수정에 실패했습니다.');
+    }
+  };
+
+  const handleCommentDelete = async (commentId: number) => {
+    if (!window.confirm('정말로 이 댓글을 삭제하시겠습니까?')) {
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        setError('로그인이 필요합니다.');
+        return;
+      }
+
+      await axiosInstance.delete(
+        `/reviews/${id}/comments/${commentId}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      await fetchComments();
+    } catch (err: any) {
+      console.error('댓글 삭제 실패:', err);
+      setError(err.response?.data?.message || '댓글 삭제에 실패했습니다.');
+    }
+  };
+
   if (isLoading) return <div className="text-center mt-8">로딩 중...</div>;
   if (error) return <div className="text-center mt-8 text-red-500">{error}</div>;
   if (!review) return <div className="text-center mt-8">리뷰를 찾을 수 없습니다.</div>;
@@ -156,11 +205,13 @@ const ReviewDetail: React.FC = () => {
               <Button variant="outline">목록으로</Button>
             </Link>
 
-            {username === review.username && (
+            {(username === review.username || isAdmin) && (
               <div className="space-x-2">
-                <Link href={`/edit-review/${id}`}>
-                  <Button variant="outline">수정</Button>
-                </Link>
+                {username === review.username && (
+                  <Link href={`/edit-review/${id}`}>
+                    <Button variant="outline">수정</Button>
+                  </Link>
+                )}
                 <Button 
                   variant="solid" 
                   onClick={handleDelete}
@@ -204,14 +255,11 @@ const ReviewDetail: React.FC = () => {
           <div className="space-y-4">
             {comments.length > 0 ? (
               comments.map((comment) => (
-                <div 
-                  key={comment.id} 
-                  className={`p-4 rounded-md ${
-                    comment.parentId ? 'ml-8 bg-gray-50 border-l-4 border-blue-200' : 'bg-gray-100'
-                  }`}
-                >
+                <div key={comment.id} className={`p-4 rounded-md ${
+                  comment.parentId ? 'ml-8 bg-gray-50 border-l-4 border-blue-200' : 'bg-gray-100'
+                }`}>
                   <div className="flex justify-between items-start">
-                    <div>
+                    <div className="w-full">
                       {comment.parentId && (
                         <span className="text-sm text-blue-500 mb-2 inline-block">
                           ↳ 답글
@@ -220,44 +268,89 @@ const ReviewDetail: React.FC = () => {
                       <p className="text-sm font-bold text-green-700 -indent-4 pl-4">
                         {comment.username}
                       </p>
-                      <p className="mt-1 text-base pl-3">
-                        {comment.content}
-                      </p>
-                      <p className="text-sm text-gray-500 mt-1">
-                        {new Date(comment.createdAt).toLocaleDateString('ko-KR', {
-                          year: 'numeric',
-                          month: 'long',
-                          day: 'numeric'
-                        })}
-                      </p>
-                      {!comment.parentId && username && (
-                        <button
-                          onClick={() => setReplyTo(comment.id)}
-                          className="text-sm text-blue-500 mt-2 hover:text-blue-700"
-                        >
-                          답글 달기
-                        </button>
-                      )}
+                      <div className="mt-1 text-base pl-3 w-full">
+                        {editingCommentId === comment.id ? (
+                          <form 
+                            onSubmit={(e) => {
+                              e.preventDefault();
+                              handleCommentEdit(comment.id);
+                            }}
+                            className="w-full"
+                          >
+                            <Textarea
+                              value={editContent}
+                              onChange={(e) => setEditContent(e.target.value)}
+                              className="w-full mb-2 min-h-[100px] p-3"
+                            />
+                            <div className="flex gap-2">
+                              <Button 
+                                type="submit" 
+                                variant="solid"
+                                className="h-8 px-2 flex items-center justify-center"
+                              >
+                                저장
+                              </Button>
+                              <Button 
+                                type="button" 
+                                variant="outline"
+                                className="h-8 px-2 flex items-center justify-center"
+                                onClick={() => {
+                                  setEditingCommentId(null);
+                                  setEditContent('');
+                                }}
+                              >
+                                취소
+                              </Button>
+                            </div>
+                          </form>
+                        ) : (
+                          <>
+                            {comment.content}
+                          </>
+                        )}
+                      </div>
+                      <div className="flex items-center mt-1">
+                        <p className="text-sm text-gray-500">
+                          {new Date(comment.createdAt).toLocaleDateString('ko-KR', {
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric'
+                          })}
+                        </p>
+                        {(username === comment.username || isAdmin) && (
+                          <div className="flex items-center ml-2">
+                            {username === comment.username && (
+                              <Button 
+                                variant="outline"
+                                className="h-6 px-1 flex items-center justify-center mr-1"
+                                onClick={() => {
+                                  setEditingCommentId(comment.id);
+                                  setEditContent(comment.content);
+                                }}
+                              >
+                                수정
+                              </Button>
+                            )}
+                            <Button 
+                              variant="outline"
+                              className="h-6 px-1 flex items-center justify-center text-red-500 hover:text-red-700"
+                              onClick={() => handleCommentDelete(comment.id)}
+                            >
+                              삭제
+                            </Button>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                   
-                  {replyTo === comment.id && (
-                    <div className="mt-4 ml-4">
-                      <form onSubmit={handleCommentSubmit}>
-                        <Textarea
-                          value={newComment}
-                          onChange={(e) => setNewComment(e.target.value)}
-                          placeholder="답글을 작성해주세요"
-                          className="w-full mb-2"
-                        />
-                        <div className="flex gap-2">
-                          <Button type="submit" variant="solid">답글 등록</Button>
-                          <Button type="button" variant="outline" onClick={() => setReplyTo(null)}>
-                            취소
-                          </Button>
-                        </div>
-                      </form>
-                    </div>
+                  {!comment.parentId && username && (
+                    <button
+                      onClick={() => setReplyTo(comment.id)}
+                      className="text-sm text-blue-500 mt-2 hover:text-blue-700"
+                    >
+                      답글 달기
+                    </button>
                   )}
                 </div>
               ))

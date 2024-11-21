@@ -74,7 +74,7 @@ export const getReviews = async (req: Request, res: Response) => {
       });
   
       return res.json({
-        reviews,
+        reviews: reviews.map(review => review.get({ plain: true })),
         currentPage: page,
         totalPages: Math.ceil(count / limit),
         totalReviews: count

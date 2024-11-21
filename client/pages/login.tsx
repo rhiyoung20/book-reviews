@@ -13,6 +13,7 @@ const Login: React.FC = () => {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [username, setUsername] = useState('')
+  const [isAdmin, setIsAdmin] = useState(false)
 
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -22,7 +23,9 @@ const Login: React.FC = () => {
       
       localStorage.setItem('token', token)
       localStorage.setItem('username', user.username)
+      localStorage.setItem('isAdmin', user.isAdmin.toString())
       setUsername(user.username)
+      setIsAdmin(user.isAdmin)
       alert(`${user.username}님 환영합니다.`)
       
       // returnUrl이 있으면 해당 페이지로, 없으면 홈으로 이동

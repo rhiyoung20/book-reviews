@@ -5,14 +5,19 @@ import config from '../config/config';
 import sequelize from '../config/database';
 import { QueryTypes } from 'sequelize';
 import { sendVerification, verifyEmail } from '../controllers/emailVerificationController';
+import { CustomRequest } from '../middleware/auth';
 
 const router = express.Router();
 
 // JWT 시크릿 키 설정
 const JWT_SECRET = process.env.JWT_SECRET || 'ptgoras916=25';
 
-// 미들웨어 함수
-const authenticateToken = (req: Request, res: Response, next: NextFunction) => {
+// 환경 변수 출력 (디버깅 용도)
+console.log('ADMIN_USERNAME:', process.env.ADMIN_USERNAME);
+console.log('ADMIN_PASSWORD:', process.env.ADMIN_PASSWORD);
+
+// 미들웨어 함수 - CustomRequest 사용
+const authenticateToken = (req: CustomRequest, res: Response, next: NextFunction) => {
   const token = req.headers.authorization?.split(' ')[1];
 
   if (!token) {
@@ -20,7 +25,11 @@ const authenticateToken = (req: Request, res: Response, next: NextFunction) => {
   }
 
   try {
-    const decoded = jwt.verify(token, JWT_SECRET) as any;
+    const decoded = jwt.verify(token, JWT_SECRET) as {
+      id: number;
+      username: string;
+      isAdmin: boolean;
+    };
     req.user = decoded;
     next();
   } catch (error) {
@@ -40,8 +49,6 @@ router.post('/check-username', async (req: Request, res: Response) => {
       });
     }
 
-    console.log('사용자명 중복 체크 요청:', username); // 디버깅용
-
     const [result] = await sequelize.query(
       'SELECT COUNT(*) as count FROM users WHERE username = :username',
       {
@@ -51,7 +58,6 @@ router.post('/check-username', async (req: Request, res: Response) => {
     );
 
     const count = (result as any).count;
-    console.log('데이터베이스 응답:', { count }); // 디버깅용
     
     res.json({
       success: true,
@@ -150,9 +156,34 @@ router.post('/signup', async (req: Request, res: Response) => {
 router.post('/login', async (req: Request, res: Response) => {
   try {
     const { email, password } = req.body;
-    console.log('로그인 시도:', { email }); // 요청 데이터 로깅
 
-    // 사용자 조회 - 이메일로 검색
+    // 관리자 계정 확인을 먼저 수행
+    if (email === process.env.ADMIN_USERNAME && password === process.env.ADMIN_PASSWORD) {
+      console.log('관리자 로그인 시도');
+      const token = jwt.sign(
+        { 
+          id: 0,
+          username: 'admin',
+          isAdmin: true 
+        },
+        JWT_SECRET,
+        { expiresIn: '24h' }
+      );
+
+      return res.json({
+        success: true,
+        token,
+        user: {
+          id: 0,
+          username: 'admin',
+          email: process.env.ADMIN_USERNAME,
+          isAdmin: true
+        }
+      });
+    }
+
+    // 일반 사용자 로그인 로직은 그 다음에 실행
+    console.log(`로그인 시도: { email: '${email}' }`);
     const [user] = await sequelize.query(
       'SELECT * FROM users WHERE email = :email',
       {
@@ -161,40 +192,32 @@ router.post('/login', async (req: Request, res: Response) => {
       }
     );
 
-    console.log('조회된 사용자:', user); // 데이터베이스 조회 결과 로깅
-
+    console.log('조회된 사용자:', user);
     if (!user) {
-      console.log('사용자를 찾을 수 없음');
       return res.status(401).json({
         success: false,
         message: '이메일 또는 비밀번호가 올바르지 않습니다.'
       });
     }
 
-    // 비밀번호 확인
     const isValidPassword = await bcrypt.compare(password, (user as any).password);
-    console.log('비밀번호 확인 결과:', isValidPassword); // 비밀번호 검증 결과 로깅
 
     if (!isValidPassword) {
-      console.log('비밀번호 불일치');
       return res.status(401).json({
         success: false,
         message: '이메일 또는 비밀번호가 올바르지 않습니다.'
       });
     }
 
-    // JWT 토큰 생성 - 새로운 JWT_SECRET 사용
     const token = jwt.sign(
       { 
         id: (user as any).id, 
         username: (user as any).username,
-        isAdmin: (user as any).isAdmin || false
+        isAdmin: false
       },
-      JWT_SECRET,  // 여기서 새로운 JWT_SECRET 사용
+      JWT_SECRET,
       { expiresIn: '24h' }
     );
-
-    console.log('로그인 성공:', { username: (user as any).username });
 
     res.json({
       success: true,
@@ -203,7 +226,7 @@ router.post('/login', async (req: Request, res: Response) => {
         id: (user as any).id,
         username: (user as any).username,
         email: (user as any).email,
-        isAdmin: (user as any).isAdmin || false
+        isAdmin: false
       }
     });
   } catch (error) {
