@@ -6,58 +6,26 @@ import {
   createComment,
   deleteComment,
   getComments,
-  updateComment
+  updateComment,
+  getUserComments
 } from '../controllers/commentController';
 import { CustomRequest } from '../middleware/auth';
 
 const router = express.Router();
 
-// 리뷰의 댓글 목록 조회 (로그인 불필요)
-router.get('/:reviewId/comments', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    await getComments(req as CustomRequest, res);
-  } catch (error) {
-    next(error);
-  }
-});
+// 사용자별 댓글 목록 조회 (로그인 필요)
+router.get('/user/:username', verifyToken, getUserComments);
 
-// 댓글 작성 (로그인 필요)
-router.post(
-  '/:reviewId/comments', 
-  verifyToken,
-  async (req: CustomRequest, res: Response, next: NextFunction) => {
-    try {
-      await createComment(req, res);
-    } catch (error) {
-      next(error);
-    }
-  }
-);
+// 리뷰별 댓글 목록 조회
+router.get('/:reviewId', getComments);
 
-// 댓글 수정 (로그인 필요)
-router.put(
-  '/:reviewId/comments/:id', 
-  verifyToken,
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      await updateComment(req as CustomRequest, res);
-    } catch (error) {
-      next(error);
-    }
-  }
-);
+// 댓글 작성
+router.post('/:reviewId', verifyToken, createComment);
 
-// 댓글 삭제 (로그인 필요)
-router.delete(
-  '/:reviewId/comments/:id', 
-  verifyToken, 
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      await deleteComment(req as CustomRequest, res);
-    } catch (error) {
-      next(error);
-    }
-  }
-);
+// 댓글 수정
+router.put('/:id', verifyToken, updateComment);
+
+// 댓글 삭제
+router.delete('/:id', verifyToken, deleteComment);
 
 export default router;

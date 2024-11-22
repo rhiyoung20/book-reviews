@@ -87,9 +87,10 @@ export const getReviews = async (req: Request, res: Response) => {
     }
   };
 
-export const getReview = async (req: Request, res: Response) => {
+export const getReview = async (req: CustomRequest, res: Response) => {
   try {
     const { id } = req.params;
+    const username = req.user?.username;
     
     const review = await Review.findByPk(id);
     
@@ -99,9 +100,10 @@ export const getReview = async (req: Request, res: Response) => {
       });
     }
 
-    // 조회수 증가
-    await review.increment('views');
-    await review.reload();
+    if (username && review.username !== username) {
+      await review.increment('views');
+      await review.reload();
+    }
 
     return res.json({ review });
   } catch (error) {

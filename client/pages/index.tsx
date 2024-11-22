@@ -123,18 +123,18 @@ function HomeComponent() {
     <div className="min-h-screen bg-gray-50">
       <Header />
       
-      <main className="container max-w-6xl mx-auto px-4 py-12">
+      <main className="container max-w-6xl mx-auto px-4 pt-8">
         {error && (
           <div className="mb-4 p-4 bg-red-100 text-red-700 rounded-md">
             {error}
           </div>
         )}
-        <div className="flex justify-between items-center mb-8">
-          <div className="flex gap-2 flex-1 max-w-2xl items-center">
+        <div className="flex justify-between items-center mb-8 gap-4 mt-4">
+          <div className="flex gap-2 flex-1 max-w-xl items-center">
             <select
               value={searchType}
               onChange={(e) => setSearchType(e.target.value as 'title' | 'username')}
-              className="w-[180px] h-10 rounded-md border border-input bg-background px-3 py-2"
+              className="w-32 h-9 rounded-md border border-input bg-background px-3 py-1 text-sm"
             >
               <option value="title">제목</option>
               <option value="username">글쓴이</option>
@@ -145,18 +145,18 @@ function HomeComponent() {
               value={searchTerm}
               onChange={handleSearchTermChange}
               onKeyPress={handleKeyPress}
-              className="flex-1 h-10"
+              className="flex-1 h-9 text-sm"
             />
             <Button
               variant="solid"
               onClick={handleSearch}
-              className="h-8 px-4 bg-blue-500 hover:bg-blue-600 text-white"
+              className="h-9 px-4 bg-blue-500 hover:bg-blue-600 text-white text-sm"
             >
               검색
             </Button>
           </div>
           <Link href="/write-review">
-            <Button variant="solid" className="bg-blue-600 hover:bg-blue-700">리뷰 작성</Button>
+            <Button variant="solid" className="h-9 bg-[#4B8A3F] hover:bg-[#3f7535] text-sm">리뷰 작성</Button>
           </Link>
         </div>
 
@@ -175,37 +175,37 @@ function HomeComponent() {
         )}
 
         {reviews.length > 0 && (
-          <div className="bg-white rounded-lg shadow overflow-hidden my-6">
+          <div className="bg-white rounded-lg shadow-sm overflow-hidden my-4">
             <table className="w-full">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">번호</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">제목</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">글쓴이</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">날짜</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">조회수</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">번호</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">제목</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">글쓴이</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">날짜</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">조회수</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {reviews.map((review, index) => (
+                {reviews.map((review) => (
                   <tr key={review.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="px-3 py-1.5 whitespace-nowrap text-xs text-gray-500">
                       {review.id}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-3 py-1.5 whitespace-nowrap">
                       <Link href={`/${review.id}`}>
-                        <span className="text-blue-600 hover:text-blue-900 cursor-pointer">
+                        <span className="text-blue-600 hover:text-blue-900 cursor-pointer text-xs">
                           {review.title}
                         </span>
                       </Link>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="px-3 py-1.5 whitespace-nowrap text-xs text-gray-500">
                       {review.username}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="px-3 py-1.5 whitespace-nowrap text-xs text-gray-500">
                       {new Date(review.createdAt).toLocaleDateString()}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="px-3 py-1.5 whitespace-nowrap text-xs text-gray-500">
                       {review.views}
                     </td>
                   </tr>
@@ -216,21 +216,23 @@ function HomeComponent() {
         )}
 
         {reviews.length > 0 && totalPages > 1 && (
-          <div className="flex justify-center mt-8 gap-2">
+          <div className="flex justify-center mt-4 gap-1">
             <Button
-              variant="outline"
+              variant="solid"
               onClick={() => handlePageChange(currentPage - 1)}
               disabled={currentPage === 1}
+              className="bg-blue-50 hover:bg-blue-100 text-black border-0 text-xs px-1"
             >
               이전
             </Button>
-            <span className="py-2 px-4">
+            <span className="py-2 px-4 text-sm text-gray-600">
               {currentPage} / {totalPages}
             </span>
             <Button
-              variant="outline"
+              variant="solid"
               onClick={() => handlePageChange(currentPage + 1)}
               disabled={currentPage === totalPages}
+              className="bg-blue-50 hover:bg-blue-100 text-black border-0 text-xs px-1"
             >
               다음
             </Button>

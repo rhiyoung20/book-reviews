@@ -1,4 +1,6 @@
-import { useState } from 'react'
+'use client'
+
+import { useState, useEffect } from 'react'
 import { Button } from "@/components/ui/Button"
 import { Input } from "@/components/ui/Input"
 import { Label } from "@/components/ui/Label"
@@ -39,6 +41,10 @@ export default function ReviewsResultPage() {
   const [totalPages, setTotalPages] = useState(1)
   const [isLoading, setIsLoading] = useState(false)
 
+  useEffect(() => {
+    fetchReviews(currentPage, sortBy)
+  }, []) // 컴포넌트 마운트 시 데이터 로드
+
   const fetchReviews = async (page: number, sort: string, search?: string) => {
     try {
       setIsLoading(true)
@@ -71,7 +77,7 @@ export default function ReviewsResultPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <div className="container mx-auto px-4 py-16">
       <Header />
       <h1 className="text-2xl font-bold mb-6">내 리뷰</h1>
 
@@ -86,7 +92,7 @@ export default function ReviewsResultPage() {
             onChange={(e) => setSearchTerm(e.target.value)}
             onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
           />
-          <Button variant="solid"onClick={handleSearch} className="ml-2">검색</Button>
+          <Button variant="solid" onClick={handleSearch} className="ml-2">검색</Button>
         </div>
         <div className="flex items-center">
           <Label htmlFor="sort" className="mr-2"></Label>
@@ -132,7 +138,6 @@ export default function ReviewsResultPage() {
         </table>
       </div>
 
-      {/* 페이지네이션 */}
       <div className="mt-4 flex justify-center">
         <nav className="inline-flex rounded-md shadow">
           <Button

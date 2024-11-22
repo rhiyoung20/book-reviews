@@ -183,8 +183,8 @@ const ReviewDetail: React.FC = () => {
   return (
     <div className="container mx-auto px-4 py-8">
       <Header />
-      <div className="max-w-3xl mx-auto">
-        <h1 className="text-2xl font-bold mb-4">{review.title}</h1>
+      <div className="max-w-2xl mx-auto">
+        <h1 className="text-xl font-bold mb-4">{review.title}</h1>
         
         <div className="bg-white rounded-lg shadow-md p-6">
           <div className="grid grid-cols-2 gap-4 mb-6">
@@ -207,18 +207,28 @@ const ReviewDetail: React.FC = () => {
 
             {(username === review.username || isAdmin) && (
               <div className="space-x-2">
-                {username === review.username && (
-                  <Link href={`/edit-review/${id}`}>
-                    <Button variant="outline">수정</Button>
-                  </Link>
+                {username === review.username ? (
+                  <>
+                    <Link href={`/edit-review/${id}`}>
+                      <Button variant="outline">수정</Button>
+                    </Link>
+                    <Button 
+                      variant="solid" 
+                      onClick={handleDelete}
+                      className="cursor-pointer text-red-500 hover:text-red-700"
+                    >
+                      삭제
+                    </Button>
+                  </>
+                ) : isAdmin && (
+                  <Button 
+                    variant="solid" 
+                    onClick={handleDelete}
+                    className="cursor-pointer text-red-500 hover:text-red-700"
+                  >
+                    삭제
+                  </Button>
                 )}
-                <Button 
-                  variant="solid" 
-                  onClick={handleDelete}
-                  className="cursor-pointer"
-                >
-                  삭제
-                </Button>
               </div>
             )}
           </div>
@@ -319,25 +329,35 @@ const ReviewDetail: React.FC = () => {
                         </p>
                         {(username === comment.username || isAdmin) && (
                           <div className="flex items-center ml-2">
-                            {username === comment.username && (
+                            {username === comment.username ? (
+                              <>
+                                <Button 
+                                  variant="outline"
+                                  className="h-6 px-1 flex items-center justify-center mr-1"
+                                  onClick={() => {
+                                    setEditingCommentId(comment.id);
+                                    setEditContent(comment.content);
+                                  }}
+                                >
+                                  수정
+                                </Button>
+                                <Button 
+                                  variant="outline"
+                                  className="h-6 px-1 flex items-center justify-center text-red-500 hover:text-red-700"
+                                  onClick={() => handleCommentDelete(comment.id)}
+                                >
+                                  삭제
+                                </Button>
+                              </>
+                            ) : isAdmin && (
                               <Button 
                                 variant="outline"
-                                className="h-6 px-1 flex items-center justify-center mr-1"
-                                onClick={() => {
-                                  setEditingCommentId(comment.id);
-                                  setEditContent(comment.content);
-                                }}
+                                className="h-6 px-1 flex items-center justify-center text-red-500 hover:text-red-700"
+                                onClick={() => handleCommentDelete(comment.id)}
                               >
-                                수정
+                                삭제
                               </Button>
                             )}
-                            <Button 
-                              variant="outline"
-                              className="h-6 px-1 flex items-center justify-center text-red-500 hover:text-red-700"
-                              onClick={() => handleCommentDelete(comment.id)}
-                            >
-                              삭제
-                            </Button>
                           </div>
                         )}
                       </div>

@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import Comment, { CommentCreationAttributes } from '../models/Comment';
 import { CustomRequest } from '../middleware/auth';
+import Review from '../models/Review';
 
 export const createComment = async (req: CustomRequest, res: Response) => {
   try {
@@ -136,6 +137,52 @@ export const updateComment = async (req: CustomRequest, res: Response) => {
     res.status(500).json({
       success: false,
       message: '댓글 수정에 실패했습니다.'
+    });
+  }
+};
+
+export const getUserComments = async (req: Request, res: Response) => {
+  try {
+    const { username } = req.params;
+    console.log('Getting comments for user:', username);
+
+    const comments = await Comment.findAll({
+      where: { username },
+      order: [['createdAt', 'DESC']],
+      include: [{
+        model: Review,
+        as: 'review',
+        attributes: ['title']
+      }]
+    });
+
+    // 쿼리 결과 상세 로그
+    console.log('Query result:', {
+      commentsCount: comments.length,
+      comments: comments.map(comment => ({
+        id: comment.id,
+        content: comment.content,
+        username: comment.username,
+        reviewId: comment.reviewId,
+        createdAt: comment.createdAt
+      }))
+    });
+
+    res.json({
+      success: true,
+      comments: comments.map((comment: Comment) => ({
+        id: comment.id,
+        content: comment.content,
+        createdAt: comment.createdAt,
+        reviewId: comment.reviewId,
+        reviewTitle: comment.Review?.title || ''
+      }))
+    });
+  } catch (error) {
+    console.error('사용자 댓글 조회 오류:', error);
+    res.status(500).json({
+      success: false,
+      message: '댓글을 불러오는데 실패했습니다.'
     });
   }
 };

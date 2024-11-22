@@ -9,6 +9,7 @@ import {
   getReviews,  
 } from '../controllers/reviewController';
 import { createComment, getComments } from '../controllers/commentController';
+import Review from '../models/Review';
 
 const router = express.Router();
 
@@ -20,6 +21,26 @@ interface AuthRequest extends Request {
     isAdmin: boolean;
   };
 }
+
+// 특정 사용자의 리뷰 목록 조회 라우트를 앞으로 이동
+router.get('/user/:username', 
+  verifyToken as RequestHandler,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      console.log('Received request for user reviews:', req.params.username);
+      const username = req.params.username;
+      const reviews = await Review.findAll({
+        where: { username: username },
+        order: [['createdAt', 'DESC']]
+      });
+      console.log('Found reviews:', reviews);
+      res.json({ reviews });
+    } catch (error) {
+      console.error('Error fetching user reviews:', error);
+      next(error);
+    }
+  }
+);
 
 // 리뷰 목록 조회 (로그인 불필요)
 router.get('/', async (req: Request, res: Response, next: NextFunction) => {

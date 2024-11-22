@@ -6,6 +6,7 @@ import sequelize from '../config/database';
 import { QueryTypes } from 'sequelize';
 import { sendVerification, verifyEmail } from '../controllers/emailVerificationController';
 import { CustomRequest } from '../middleware/auth';
+import { generateTempPassword, sendTempPasswordEmail } from '../utils/email';
 
 const router = express.Router();
 
@@ -234,6 +235,60 @@ router.post('/login', async (req: Request, res: Response) => {
     res.status(500).json({
       success: false,
       message: '로그인 처리 중 오류가 발생했습니다.'
+    });
+  }
+});
+
+// 비밀번호 찾기
+router.post('/forgot-password', async (req: Request, res: Response) => {
+  try {
+    const { email } = req.body;
+    console.log('받은 이메일:', email); // 디버깅용 로그 추가
+
+    // 사용자 확인 쿼리 수정 (users로 테이블명 수정)
+    const [results] = await sequelize.query(
+      'SELECT * FROM users WHERE email = :email',
+      {
+        replacements: { email },
+        type: QueryTypes.SELECT
+      }
+    );
+
+    console.log('조회 결과:', results); // 디버깅용 로그 추가
+
+    if (!results) {
+      return res.status(404).json({
+        success: false,
+        message: '해당 이메일로 등록된 사용자를 찾을 수 없습니다.'
+      });
+    }
+
+    // 임시 비밀번호 생성
+    const tempPassword = generateTempPassword();
+    const hashedPassword = await bcrypt.hash(tempPassword, 10);
+
+    // DB에 임시 비밀번호 저장 (users로 테이블명 수정)
+    await sequelize.query(
+      'UPDATE users SET password = :password WHERE email = :email',
+      {
+        replacements: { password: hashedPassword, email },
+        type: QueryTypes.UPDATE
+      }
+    );
+
+    // 이메일로 임시 비밀번호 전송
+    await sendTempPasswordEmail(email, tempPassword);
+
+    res.json({
+      success: true,
+      message: '임시 비밀번호가 이메일로 발송되었습니다.'
+    });
+
+  } catch (error) {
+    console.error('비밀번호 재설정 오류:', error);
+    res.status(500).json({
+      success: false,
+      message: '비밀번호 재설정 중 오류가 발생했습니다.'
     });
   }
 });

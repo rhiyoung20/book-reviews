@@ -1,34 +1,29 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Button } from "../components/ui/Button"
-import { Input } from "../components/ui/Input"
-import { Label } from "../components/ui/Label"
+import { Button } from "@/components/ui/Button"
+import { Input } from "@/components/ui/Input"
+import { Label } from "@/components/ui/Label"
 import Link from 'next/link'
-import axiosInstance from '../utils/axios'
-import Header from '../components/Header'
-import router, { useRouter } from 'next/router'
-import dynamic from 'next/dynamic';
-
-const Select = dynamic(() => import('@radix-ui/react-select').then(mod => mod.Root), {
-  ssr: false
-});
-
-const SelectTrigger = dynamic(() => import('@radix-ui/react-select').then(mod => mod.Trigger), {
-  ssr: false
-});
-
-const SelectValue = dynamic(() => import('@radix-ui/react-select').then(mod => mod.Value), {
-  ssr: false
-});
-
-const SelectContent = dynamic(() => import('@radix-ui/react-select').then(mod => mod.Content), {
-  ssr: false
-});
-
-const SelectItem = dynamic(() => import('@radix-ui/react-select').then(mod => mod.Item), {
-  ssr: false
-});
+import axiosInstance from '@/utils/axios'
+import Header from '@/components/Header'
+import { useRouter } from 'next/router'
+import dynamic from 'next/dynamic'
+const Select = dynamic(() => import('@/components/ui/Select').then(mod => mod.Select), {
+ssr: false
+})
+const SelectContent = dynamic(() => import('@/components/ui/Select').then(mod => mod.SelectContent), {
+ssr: false
+})
+const SelectItem = dynamic(() => import('@/components/ui/Select').then(mod => mod.SelectItem), {
+ssr: false
+})
+const SelectTrigger = dynamic(() => import('@/components/ui/Select').then(mod => mod.SelectTrigger), {
+ssr: false
+})
+const SelectValue = dynamic(() => import('@/components/ui/Select').then(mod => mod.SelectValue), {
+ssr: false
+})
 
 interface Comment {
   id: number;
@@ -36,9 +31,9 @@ interface Comment {
   reviewId: number;
   reviewTitle: string;
   createdAt: string;
-}
-
-export default function ReplyResultPage() {
+  }
+  export default function ReplyResultPage() {
+  const router = useRouter()
   const [searchTerm, setSearchTerm] = useState('')
   const [sortBy, setSortBy] = useState('latest')
   const [currentPage, setCurrentPage] = useState(1)
@@ -47,22 +42,17 @@ export default function ReplyResultPage() {
   const [isLoading, setIsLoading] = useState(false)
 
   const fetchComments = async (page: number, sort: string, search?: string) => {
+    setIsLoading(true)
     try {
-      setIsLoading(true)
-      const response = await axiosInstance.get(`/users/comments`, {
-        params: {
-          page,
-          sort,
-          search
-        },
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('token')}`
-        }
+      const response = await axiosInstance.get('/comments/my', {
+        params: { page, sort, search },
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       })
       setComments(response.data.comments)
       setTotalPages(response.data.totalPages)
+      setCurrentPage(page)
     } catch (error) {
-      console.error('댓글 목록 조회 오류:', error)
+      console.error('댓글 로딩 오류:', error)
     } finally {
       setIsLoading(false)
     }
@@ -70,7 +60,7 @@ export default function ReplyResultPage() {
 
   useEffect(() => {
     fetchComments(currentPage, sortBy)
-  }, [currentPage, sortBy])
+  }, [])
 
   const handleSearch = () => {
     fetchComments(1, sortBy, searchTerm)
@@ -101,7 +91,7 @@ export default function ReplyResultPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <div className="container mx-auto px-4 py-16">
       <Header />
       <h1 className="text-2xl font-bold mb-6">내 댓글</h1>
 
@@ -120,16 +110,18 @@ export default function ReplyResultPage() {
         </div>
         <div className="flex items-center">
           <Label htmlFor="sort" className="mr-2"></Label>
-          <Select value={sortBy} onValueChange={handleSort}>
-            <SelectTrigger id="sort" className="w-[180px]">
-              <SelectValue placeholder="정렬 기준" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="latest">최신순</SelectItem>
-              <SelectItem value="oldest">오래된순</SelectItem>
-              <SelectItem value="most-viewed">조회수 높은순</SelectItem>
-            </SelectContent>
-          </Select>
+          {!isLoading && (
+            <Select value={sortBy} onValueChange={handleSort}>
+              <SelectTrigger id="sort" className="w-[180px]">
+                <SelectValue placeholder="정렬 기준" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="latest">최신순</SelectItem>
+                <SelectItem value="oldest">오래된순</SelectItem>
+                <SelectItem value="most-viewed">조회수 높은순</SelectItem>
+              </SelectContent>
+            </Select>
+          )}
         </div>
       </div>
 
@@ -148,7 +140,7 @@ export default function ReplyResultPage() {
               <tr key={comment.id}>
                 <td className="px-6 py-4 text-sm text-gray-900">{comment.content}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-blue-600 hover:underline">
-                  <Link href={`/${comment.reviewId}`}>{comment.reviewTitle}</Link>
+                  <Link href={`/review/${comment.reviewId}`}>{comment.reviewTitle}</Link>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                   {new Date(comment.createdAt).toLocaleDateString()}
@@ -158,7 +150,7 @@ export default function ReplyResultPage() {
                     <Button 
                       variant="outline" 
                       size="sm"
-                      onClick={() => router.push(`/${comment.reviewId}?editComment=${comment.id}`)}
+                      onClick={() => router.push(`/review/${comment.reviewId}?editComment=${comment.id}`)}
                     >
                       수정
                     </Button>
@@ -177,7 +169,6 @@ export default function ReplyResultPage() {
         </table>
       </div>
 
-      {/* 페이지네이션 */}
       <div className="mt-4 flex justify-center">
         <nav className="inline-flex rounded-md shadow">
           <Button
@@ -188,7 +179,7 @@ export default function ReplyResultPage() {
           >
             이전
           </Button>
-          <span className="px-4 py-2 bg-white text-gray-700 text-sm">
+          <span className="px-4 py-2 bg-w그런hite text-gray-700 text-sm">
             {currentPage} / {totalPages}
           </span>
           <Button

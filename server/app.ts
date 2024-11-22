@@ -6,7 +6,7 @@ import pool from './config/database';
 import config from './config/config';
 import authRoutes from './routes/auth';
 import reviewRoutes from './routes/reviews';
-import commentRoutes from './routes/comments';
+import commentRouter from './routes/comments';
 import userRoutes from './routes/users';
 import sequelize from './config/database';
 import session from 'express-session';
@@ -22,6 +22,8 @@ console.log('ADMIN_USERNAME:', process.env.ADMIN_USERNAME);
 console.log('ADMIN_PASSWORD:', process.env.ADMIN_PASSWORD);
 console.log('JWT_SECRET:', process.env.JWT_SECRET);
 console.log('SESSION_SECRET:', process.env.SESSION_SECRET);
+console.log('EMAIL_USER:', process.env.EMAIL_USER);
+console.log('EMAIL_PASS:', process.env.EMAIL_PASS?.substring(0, 4) + '...'); // 보안을 위해 일부만 출력
 
 const app = express();
 
@@ -65,7 +67,7 @@ app.use(session({
 // 라우트 설정
 app.use('/api/auth', authRoutes);
 app.use('/api/reviews', reviewRoutes);
-app.use('/api/reviews', commentRoutes);
+app.use('/api/comments', commentRouter);
 app.use('/users', userRoutes);
 
 // 에러 핸들링

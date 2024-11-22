@@ -1,23 +1,20 @@
-import { DataTypes, Model, Optional } from 'sequelize';
+import { Model, DataTypes } from 'sequelize';
 import sequelize from '../config/database';
+import Review from './Review';
 
 interface CommentAttributes {
   id: number;
   content: string;
   username: string;
   reviewId: number;
-  parentId?: number | null;
+  parentId: number | null;
   createdAt: Date;
   updatedAt: Date;
 }
-export interface CommentCreationAttributes extends Optional<CommentAttributes, 'id' | 'createdAt' | 'updatedAt' | 'parentId'> {
-  content: string;
-  username: string;
-  reviewId: number;
-  parentId?: number | null;
-}
 
-class Comment extends Model<CommentAttributes, CommentCreationAttributes> {
+export interface CommentCreationAttributes extends Omit<CommentAttributes, 'id' | 'createdAt' | 'updatedAt'> {}
+
+class Comment extends Model<CommentAttributes, CommentCreationAttributes> implements CommentAttributes {
   public id!: number;
   public content!: string;
   public username!: string;
@@ -25,6 +22,8 @@ class Comment extends Model<CommentAttributes, CommentCreationAttributes> {
   public parentId!: number | null;
   public createdAt!: Date;
   public updatedAt!: Date;
+
+  public Review?: Review; // Review 모델과의 관계를 위한 타입 선언
 }
 
 Comment.init(
@@ -39,7 +38,7 @@ Comment.init(
       allowNull: false,
     },
     username: {
-      type: DataTypes.STRING(191),
+      type: DataTypes.STRING,
       allowNull: false,
     },
     reviewId: {
@@ -53,19 +52,22 @@ Comment.init(
     createdAt: {
       type: DataTypes.DATE,
       allowNull: false,
-      defaultValue: DataTypes.NOW,
     },
     updatedAt: {
       type: DataTypes.DATE,
       allowNull: false,
-      defaultValue: DataTypes.NOW,
     },
   },
   {
     sequelize,
     modelName: 'Comment',
-    tableName: 'comments',
   }
 );
+
+// Review 모델과의 관계 설정
+Comment.belongsTo(Review, {
+  foreignKey: 'reviewId',
+  as: 'review'
+});
 
 export default Comment;

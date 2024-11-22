@@ -4,7 +4,6 @@ import { Input } from "@/components/ui/Input"
 import { Label } from "@/components/ui/Label"
 import Link from 'next/link'
 import axiosInstance from '@/utils/axios'
-import Header from '@/components/Header'
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('')
@@ -16,14 +15,19 @@ export default function ForgotPasswordPage() {
     e.preventDefault()
     setIsLoading(true)
     setMessage('')
-    setTempPassword('')
 
     try {
       const response = await axiosInstance.post('/auth/forgot-password', { email })
-      setTempPassword(response.data.tempPassword)
-      setMessage('임시 비밀번호가 이메일로 발송되었습니다. 이 비밀번호로 로그인한 후 새 비밀번호를 설정해주세요.')
-    } catch (error) {
-      setMessage('비밀번호 재설정 요청 중 오류가 발생했습니다. 다시 시도해 주세요.')
+      if (response.data.success) {
+        setMessage('임시 비밀번호가 이메일로 발송되었습니다. 이메일을 확인해주세요.')
+      }
+    } catch (error: any) {
+      if (error.response?.status === 404) {
+        setMessage('등록되지 않은 이메일 주소입니다.')
+      } else {
+        setMessage('비밀번호 재설정 요청 중 오류가 발생했습니다. 다시 시도해 주세요.')
+        console.error('Error:', error)
+      }
     } finally {
       setIsLoading(false)
     }
@@ -31,14 +35,13 @@ export default function ForgotPasswordPage() {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <Header />
       <div className="max-w-md mx-auto">
         <header className="flex justify-center mb-8">
           <Link href="/" className="text-3xl font-bold text-green-600">
             책익는 마을
           </Link>
         </header>
-        <h1 className="text-2xl font-bold mb-6">비밀번호 찾기</h1>
+        <h2 className="text-xl font-bold mb-6">비밀번호 찾기</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <Label htmlFor="email">이메일</Label>
@@ -67,11 +70,6 @@ export default function ForgotPasswordPage() {
         {tempPassword && (
           <p className="mt-4 text-sm font-bold">임시 비밀번호: {tempPassword}</p>
         )}
-        <div className="mt-4 text-center text-sm">
-          <Link href="/login" className="text-blue-600 hover:underline">
-            로그인으로 돌아가기
-          </Link>
-        </div>
       </div>
     </div>
   )
