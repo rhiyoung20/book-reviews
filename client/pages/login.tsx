@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useContext } from 'react'
 import { Button } from "../components/ui/Button"
 import { Input } from "../components/ui/Input"
 import { Label } from "../components/ui/Label"
@@ -6,6 +6,7 @@ import axios from "axios"
 import Link from 'next/link'
 import { useRouter } from 'next/router'
 import axiosInstance from '../utils/axios'
+import { UserContext } from '../context/UserContext'
 
 const Login: React.FC = () => {
   const router = useRouter()
@@ -14,6 +15,7 @@ const Login: React.FC = () => {
   const [password, setPassword] = useState('')
   const [username, setUsername] = useState('')
   const [isAdmin, setIsAdmin] = useState(false)
+  const { setUsername: setContextUsername } = useContext(UserContext)
 
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -24,11 +26,11 @@ const Login: React.FC = () => {
       localStorage.setItem('token', token)
       localStorage.setItem('username', user.username)
       localStorage.setItem('isAdmin', user.isAdmin.toString())
+      setContextUsername(user.username)
       setUsername(user.username)
       setIsAdmin(user.isAdmin)
       alert(`${user.username}님 환영합니다.`)
       
-      // returnUrl이 있으면 해당 페이지로, 없으면 홈으로 이동
       router.push(returnUrl as string || '/')
     } catch (error: any) {
       console.error('로그인 오류:', error)

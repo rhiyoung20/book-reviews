@@ -144,39 +144,34 @@ export const updateComment = async (req: CustomRequest, res: Response) => {
 export const getUserComments = async (req: Request, res: Response) => {
   try {
     const { username } = req.params;
-    console.log('Getting comments for user:', username);
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 5;
+    const offset = (page - 1) * limit;
 
-    const comments = await Comment.findAll({
+    const { count, rows: comments } = await Comment.findAndCountAll({
       where: { username },
       order: [['createdAt', 'DESC']],
       include: [{
         model: Review,
         as: 'review',
         attributes: ['title']
-      }]
-    });
-
-    // 쿼리 결과 상세 로그
-    console.log('Query result:', {
-      commentsCount: comments.length,
-      comments: comments.map(comment => ({
-        id: comment.id,
-        content: comment.content,
-        username: comment.username,
-        reviewId: comment.reviewId,
-        createdAt: comment.createdAt
-      }))
+      }],
+      limit,
+      offset
     });
 
     res.json({
       success: true,
-      comments: comments.map((comment: Comment) => ({
+      comments: comments.map(comment => ({
         id: comment.id,
         content: comment.content,
         createdAt: comment.createdAt,
         reviewId: comment.reviewId,
         reviewTitle: comment.Review?.title || ''
-      }))
+      })),
+      total: count,
+      currentPage: page,
+      totalPages: Math.ceil(count / limit)
     });
   } catch (error) {
     console.error('사용자 댓글 조회 오류:', error);

@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { Button } from './ui/Button';
 import { UserContext } from '@/context/UserContext';
-import axiosInstance from '../utils/axios';
+import axios from 'axios';
 
 interface HeaderProps {
   hideAuthButtons?: boolean;
@@ -11,27 +11,20 @@ interface HeaderProps {
 
 const Header = ({ hideAuthButtons = false }: HeaderProps) => {
   const router = useRouter();
-  const { username, setUsername } = useContext(UserContext);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const { username, setUsername, checkAuthStatus } = useContext(UserContext);
 
   useEffect(() => {
-    // 로컬 스토리지에서 사용자 정보 확인
-    const storedUsername = localStorage.getItem('username');
     const token = localStorage.getItem('token');
+    const storedUsername = localStorage.getItem('username');
     
-    if (storedUsername && token) {
-      setIsLoggedIn(true);
+    if (token && storedUsername) {
       setUsername(storedUsername);
-    } else {
-      setIsLoggedIn(false);
-      setUsername('');
     }
-  }, [setUsername]); // username이 변경될 때마다 실행
+  }, [setUsername]);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     localStorage.removeItem('token');
     localStorage.removeItem('username');
-    setIsLoggedIn(false);
     setUsername('');
     router.push('/');
   };
@@ -46,7 +39,7 @@ const Header = ({ hideAuthButtons = false }: HeaderProps) => {
           
           {!hideAuthButtons && (
             <div className="flex items-center space-x-4">
-              {isLoggedIn && username ? (
+              {username ? (
                 <>
                   <span className="text-gray-600">{username}님 환영합니다</span>
                   <Link href="/mypage">

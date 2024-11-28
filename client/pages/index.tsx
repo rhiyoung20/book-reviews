@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import Link from 'next/link';
@@ -6,6 +6,7 @@ import axiosInstance from '@/utils/axios';
 import dynamic from 'next/dynamic'
 import { useRouter } from 'next/router';
 import Header from '@/components/Header';
+import { UserContext } from '@/context/UserContext';
 
 interface Review {
   id: number;
@@ -26,6 +27,7 @@ interface ReviewsResponse {
 function HomeComponent() {
   const router = useRouter();
   const { page = '1', type, term } = router.query;
+  const { checkAuthStatus } = useContext(UserContext);
 
   const [searchType, setSearchType] = useState<'title' | 'username'>(
     (type as 'title' | 'username') || 'title'
@@ -87,6 +89,18 @@ function HomeComponent() {
       router.push('/');
     }
   };
+
+  useEffect(() => {
+    const validateAuth = async () => {
+      const isAuthenticated = await checkAuthStatus();
+      if (!isAuthenticated) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('username');
+      }
+    };
+    
+    validateAuth();
+  }, []);
 
   useEffect(() => {
     const currentPage = parseInt(page as string) || 1;
@@ -156,7 +170,7 @@ function HomeComponent() {
             </Button>
           </div>
           <Link href="/write-review">
-            <Button variant="solid" className="h-9 bg-[#4B8A3F] hover:bg-[#3f7535] text-sm">리뷰 작성</Button>
+            <Button variant="solid" className="h-9 bg-green-600 hover:bg-[#3f7535] text-sm">리뷰 작성</Button>
           </Link>
         </div>
 
@@ -221,7 +235,7 @@ function HomeComponent() {
               variant="solid"
               onClick={() => handlePageChange(currentPage - 1)}
               disabled={currentPage === 1}
-              className="bg-blue-50 hover:bg-blue-100 text-black border-0 text-xs px-1"
+              className="bg-blue-20 hover:bg-blue-100 text-black border-0 text-xs px-1"
             >
               이전
             </Button>
@@ -232,7 +246,7 @@ function HomeComponent() {
               variant="solid"
               onClick={() => handlePageChange(currentPage + 1)}
               disabled={currentPage === totalPages}
-              className="bg-blue-50 hover:bg-blue-100 text-black border-0 text-xs px-1"
+              className="bg-blue-20 hover:bg-blue-100 text-black border-0 text-xs px-1"
             >
               다음
             </Button>

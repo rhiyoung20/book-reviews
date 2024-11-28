@@ -25,6 +25,16 @@ interface Comment {
   reviewId: number;
 }
 
+interface ReviewResponse {
+  reviews: Review[];
+  total: number;  // 전체 리뷰 수
+}
+
+interface CommentResponse {
+  comments: Comment[];
+  total: number;  // 전체 댓글 수
+}
+
 export default function MyPage() {
   const { username, checkAuthStatus } = useContext(UserContext);
   const [activeTab, setActiveTab] = useState("reviews")
@@ -38,30 +48,58 @@ export default function MyPage() {
   const [passwordMessage, setPasswordMessage] = useState('')
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const ITEMS_PER_PAGE = 10;
+  const ITEMS_PER_PAGE = 5;
 
   useEffect(() => {
     const validateAuth = async () => {
       const token = localStorage.getItem('token');
+      
       if (!token || !username) {
         router.push('/login');
         return;
       }
 
       try {
-        await axiosInstance.get('/auth/verify');
+        const response = await axiosInstance.get('/auth/verify', {
+          headers: { 
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        if (response.data.success) {
+          const reviewsResponse = await axiosInstance.get(`/reviews/user/${username}`, {
+            params: {
+              page: 1,
+              limit: ITEMS_PER_PAGE
+            },
+            headers: {
+              Authorization: `Bearer ${token}`
+            }
+          });
+          
+          if (reviewsResponse.data) {
+            setUserReviews(reviewsResponse.data.reviews);
+            setTotalPages(Math.ceil(reviewsResponse.data.total / ITEMS_PER_PAGE));
+          }
+        } else {
+          router.push('/login');
+        }
       } catch (error) {
-        await checkAuthStatus(); // UserContext의 인증 상태 갱신
+        console.error('Auth verification error:', error);
         router.push('/login');
       }
     };
 
-    validateAuth();
-  }, [username, router]);
+    if (username) {
+      validateAuth();
+    }
+  }, [username]);
 
   const handleTabChange = async (value: string) => {
     setActiveTab(value);
     setCurrentPage(1);
+    const token = localStorage.getItem('token');
     
     if (value === 'comments') {
       try {
@@ -69,14 +107,35 @@ export default function MyPage() {
           params: {
             page: 1,
             limit: ITEMS_PER_PAGE
+          },
+          headers: {
+            Authorization: `Bearer ${token}`
           }
         });
-        if (response.data && response.data.success) {
+        if (response.data) {
           setUserComments(response.data.comments);
           setTotalPages(Math.ceil(response.data.total / ITEMS_PER_PAGE));
         }
       } catch (error) {
         console.error('Error fetching comments:', error);
+      }
+    } else {
+      try {
+        const response = await axiosInstance.get(`/reviews/user/${username}`, {
+          params: {
+            page: 1,
+            limit: ITEMS_PER_PAGE
+          },
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        });
+        if (response.data) {
+          setUserReviews(response.data.reviews);
+          setTotalPages(Math.ceil(response.data.total / ITEMS_PER_PAGE));
+        }
+      } catch (error) {
+        console.error('Error fetching reviews:', error);
       }
     }
   };
@@ -106,22 +165,44 @@ export default function MyPage() {
   }
 
   const handlePageChange = async (newPage: number) => {
-    setCurrentPage(newPage);
+    const token = localStorage.getItem('token');
     
     try {
-      const response = await axiosInstance.get(`/reviews/user/${username}`, {
-        params: {
-          page: newPage,
-          limit: ITEMS_PER_PAGE
+      if (activeTab === 'reviews') {
+        const response = await axiosInstance.get(`/reviews/user/${username}`, {
+          params: {
+            page: newPage,
+            limit: ITEMS_PER_PAGE
+          },
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        });
+        
+        if (response.data.success) {
+          setUserReviews(response.data.reviews);
+          setTotalPages(response.data.totalPages);
+          setCurrentPage(newPage);
         }
-      });
-      
-      if (response.data) {
-        setUserReviews(response.data.reviews);
-        setTotalPages(Math.ceil(response.data.total / ITEMS_PER_PAGE));
+      } else {
+        const response = await axiosInstance.get(`/comments/user/${username}`, {
+          params: {
+            page: newPage,
+            limit: ITEMS_PER_PAGE
+          },
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        });
+        
+        if (response.data.success) {
+          setUserComments(response.data.comments);
+          setTotalPages(response.data.totalPages);
+          setCurrentPage(newPage);
+        }
       }
     } catch (error) {
-      console.error('Error fetching reviews:', error);
+      console.error('Error fetching data:', error);
     }
   };
 
@@ -173,14 +254,14 @@ export default function MyPage() {
             <div className="w-1/2 flex space-x-2">
               <Button 
                 variant={activeTab === 'reviews' ? 'solid' : 'outline'}
-                className={`flex-1 ${activeTab === 'reviews' ? 'bg-[#4B8A3F] hover:bg-[#3f7535]' : ''}`}
+                className={`flex-1 ${activeTab === 'reviews' ? 'bg-green-600 text-white' : ''}`}
                 onClick={() => handleTabChange('reviews')}
               >
                 내 리뷰
               </Button>
               <Button 
                 variant={activeTab === 'comments' ? 'solid' : 'outline'}
-                className="flex-1"
+                className={`flex-1 ${activeTab === 'comments' ? 'text-white' : ''}`}
                 onClick={() => handleTabChange('comments')}
               >
                 내 댓글

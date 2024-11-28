@@ -195,3 +195,33 @@ export const deleteReview = async (req: CustomRequest, res: Response) => {
     });
   }
 };
+
+export const getUserReviews = async (req: Request, res: Response) => {
+  try {
+    const { username } = req.params;
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 5;
+    const offset = (page - 1) * limit;
+
+    const { count, rows: reviews } = await Review.findAndCountAll({
+      where: { username },
+      order: [['createdAt', 'DESC']],
+      limit,
+      offset
+    });
+
+    res.json({
+      success: true,
+      reviews,
+      total: count,
+      currentPage: page,
+      totalPages: Math.ceil(count / limit)
+    });
+  } catch (error) {
+    console.error('사용자 리뷰 조회 오류:', error);
+    res.status(500).json({
+      success: false,
+      message: '리뷰를 불러오는데 실패했습니다.'
+    });
+  }
+};

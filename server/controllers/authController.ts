@@ -165,25 +165,48 @@ export const checkUsername = async (req: Request, res: Response) => {
   try {
     const { username } = req.body;
     
-    const users = await sequelize.query(
-      'SELECT * FROM users WHERE username = ?',
+    const [result] = await sequelize.query(
+      'SELECT COUNT(*) as count FROM users WHERE username = ?',
       {
         replacements: [username],
         type: QueryTypes.SELECT
       }
     );
 
-    const exists = users.length > 0;
+    // count 값 추출
+    const count = (result as any).count;
     
     res.json({
       success: true,
-      exists
+      available: count === 0,
+      count: count,
+      message: count === 0 ? '사용 가능한 사용자명입니다.' : '이미 사용 중인 사용자명입니다.'
     });
   } catch (error) {
     console.error('사용자명 중복 체크 오류:', error);
     res.status(500).json({
       success: false,
       message: '사용자명 중복 체크 중 오류가 발생했습니다.'
+    });
+  }
+};
+
+// 인증 상태 확인
+export const verifyAuth = async (req: Request, res: Response) => {
+  try {
+    // 이미 authenticateToken 미들웨어를 통과했다면 인증된 상태
+    const user = (req as any).user;  // CustomRequest 타입 사용
+    
+    res.json({
+      success: true,
+      username: user.username,
+      isAdmin: user.isAdmin
+    });
+  } catch (error) {
+    console.error('인증 확인 오류:', error);
+    res.status(401).json({
+      success: false,
+      message: '인증에 실패했습니다.'
     });
   }
 };

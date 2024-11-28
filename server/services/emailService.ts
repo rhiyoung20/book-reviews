@@ -46,9 +46,9 @@ export const sendVerificationEmail = async (email: string) => {
       }
     });
 
-    // 인증 URL 생성
-    const verificationUrl = `${process.env.FRONTEND_URL}/verify-email?token=${verificationToken}`;
-
+    // 인증 URL 생성 부분 수정
+    const verificationUrl = `${process.env.FRONTEND_URL}/signup?token=${verificationToken}&email=${encodeURIComponent(email)}`;
+    
     const mailOptions = {
       from: process.env.SMTP_USER,
       to: email,
@@ -61,17 +61,21 @@ export const sendVerificationEmail = async (email: string) => {
           </p>
           <div style="text-align: center; margin: 30px 0;">
             <a href="${verificationUrl}" 
+               target="_self"
                style="background-color: #4CAF50; 
                       color: white; 
                       padding: 12px 24px; 
                       text-decoration: none; 
                       border-radius: 4px;
-                      display: inline-block;">
+                      display: inline-block;"
+               rel="noopener noreferrer">
               이메일 인증하기
             </a>
           </div>
           <p style="color: #666; font-size: 0.9em;">
-            이 링크는 24시간 동안 유효합니다.
+            이 링크는 24시간 동안 유효합니다.<br>
+            링크가 작동하지 않는 경우 아래 URL을 복사하여 브라우저에 붙여넣으세요:<br>
+            <span style="color: #4CAF50;">${verificationUrl}</span>
           </p>
         </div>
       `

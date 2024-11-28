@@ -69,7 +69,9 @@ export const verifyEmail = async (req: Request, res: Response): Promise<void> =>
     res.status(200).json({ 
       success: true, 
       message: '이메일이 성공적으로 인증되었습니다.',
-      email: verification.email 
+      email: verification.email,
+      verified: true,
+      preserveState: true
     });
   } catch (error) {
     console.error('이메일 인증 오류:', error);

@@ -4,9 +4,16 @@ import bcrypt from 'bcryptjs';
 import config from '../config/config';
 import sequelize from '../config/database';
 import { QueryTypes } from 'sequelize';
-import { sendVerification, verifyEmail } from '../controllers/emailVerificationController';
+import { sendVerification, verifyEmail as verifyEmailController } from '../controllers/emailVerificationController';
 import { CustomRequest } from '../middleware/auth';
 import { generateTempPassword, sendTempPasswordEmail } from '../utils/email';
+import { 
+  login, 
+  verifyEmail, 
+  checkUsername,
+  verifyAuth  // 추가
+} from '../controllers/authController';
+import { verifyToken } from '../middleware/auth';  // 이걸로 통일
 
 const router = express.Router();
 
@@ -16,27 +23,6 @@ const JWT_SECRET = process.env.JWT_SECRET || 'ptgoras916=25';
 // 환경 변수 출력 (디버깅 용도)
 console.log('ADMIN_USERNAME:', process.env.ADMIN_USERNAME);
 console.log('ADMIN_PASSWORD:', process.env.ADMIN_PASSWORD);
-
-// 미들웨어 함수 - CustomRequest 사용
-const authenticateToken = (req: CustomRequest, res: Response, next: NextFunction) => {
-  const token = req.headers.authorization?.split(' ')[1];
-
-  if (!token) {
-    return res.status(401).json({ message: '인증 토큰이 필요합니다.' });
-  }
-
-  try {
-    const decoded = jwt.verify(token, JWT_SECRET) as {
-      id: number;
-      username: string;
-      isAdmin: boolean;
-    };
-    req.user = decoded;
-    next();
-  } catch (error) {
-    return res.status(401).json({ message: '유효하지 않은 토큰입니다.' });
-  }
-};
 
 // 사용자명 중복 체크
 router.post('/check-username', async (req: Request, res: Response) => {
@@ -78,7 +64,7 @@ router.post('/check-username', async (req: Request, res: Response) => {
 router.post('/send-verification', sendVerification);
 
 // 이메일 인증 확인
-router.post('/verify-email', verifyEmail);
+router.post('/verify-email', verifyEmailController);
 
 // 회원가입
 router.post('/signup', async (req: Request, res: Response) => {
@@ -292,5 +278,8 @@ router.post('/forgot-password', async (req: Request, res: Response) => {
     });
   }
 });
+
+// 인증 상태 확인 엔드포인트 추가
+router.get('/verify', verifyToken, verifyAuth);
 
 export default router;
