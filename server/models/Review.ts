@@ -55,8 +55,12 @@ Review.init(
       defaultValue: 0
     },
     username: {
-      type: DataTypes.STRING(191),
+      type: DataTypes.STRING,
       allowNull: false,
+      references: {
+        model: 'users',
+        key: 'username'
+      }
     },
     publisher: {
       type: DataTypes.STRING,
@@ -90,7 +94,7 @@ Review.init(
       withoutOrder: {
         order: undefined
       }
-    }
+    },
   }
 );
 

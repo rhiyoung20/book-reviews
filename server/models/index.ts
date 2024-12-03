@@ -1,13 +1,20 @@
-import { Comment } from './Comment';
-import { User } from './User';
+import User from './User';
 import Review from './Review';
-import { initReview } from './Review';  
+import Comment from './Comment';
 
-// Review 모델 초기화
-const ReviewModel = initReview();
+// 관계 설정
+Review.hasMany(Comment, {
+  foreignKey: 'reviewId',
+  as: 'comments'
+});
+
+Comment.belongsTo(Review, {
+  foreignKey: 'reviewId',
+  as: 'review'
+});
 
 export {
-  Comment,
   User,
-  ReviewModel as Review
+  Review,
+  Comment
 };

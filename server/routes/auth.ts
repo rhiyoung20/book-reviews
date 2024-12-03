@@ -14,6 +14,7 @@ import {
   verifyAuth  // 추가
 } from '../controllers/authController';
 import { verifyToken } from '../middleware/auth';  // 이걸로 통일
+import { PrismaClient } from '@prisma/client';
 
 const router = express.Router();
 
@@ -28,6 +29,7 @@ console.log('ADMIN_PASSWORD:', process.env.ADMIN_PASSWORD);
 router.post('/check-username', async (req: Request, res: Response) => {
   try {
     const { username } = req.body;
+    console.log('Checking username:', username); // 디버깅 로그 추가
     
     if (!username) {
       return res.status(400).json({
@@ -45,6 +47,7 @@ router.post('/check-username', async (req: Request, res: Response) => {
     );
 
     const count = (result as any).count;
+    console.log('Username check result:', count); // 디버깅 로그 추가
     
     res.json({
       success: true,
@@ -68,69 +71,35 @@ router.post('/verify-email', verifyEmailController);
 
 // 회원가입
 router.post('/signup', async (req: Request, res: Response) => {
-  const t = await sequelize.transaction();
-  
   try {
     const { username, email, password, phone } = req.body;
-
-    // 이메일 인증 상태 확인
-    const [verifications] = await sequelize.query(
-      'SELECT * FROM email_verifications WHERE email = ? AND verified = true AND expiresAt > NOW()',
-      {
-        replacements: [email],
-        type: QueryTypes.SELECT
-      }
-    );
-
-    if (!verifications) {
-      await t.rollback();
-      return res.status(400).json({ 
-        success: false, 
-        message: '이메일 인증이 필요합니다.' 
-      });
-    }
-
-    // 사용자명 중복 체크
-    const [existingUser] = await sequelize.query(
-      'SELECT id FROM users WHERE username = ?',
-      {
-        replacements: [username],
-        type: QueryTypes.SELECT
-      }
-    );
-
-    if (existingUser) {
-      await t.rollback();
-      return res.status(400).json({
-        success: false,
-        message: '이미 사용 중인 사용자명입니다.'
-      });
-    }
-
-    // 비밀번호 해싱
+    
+    // 비밀번호 해시화
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // 현재 시간
-    const now = new Date();
-
-    // 사용자 생성
     await sequelize.query(
-      `INSERT INTO users (username, email, password, phone, createdAt, updatedAt) 
-       VALUES (?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO users (
+        username, 
+        email, 
+        password, 
+        phone
+      ) VALUES (
+        :username,
+        :email,
+        :password,
+        :phone
+      )`,
       {
-        replacements: [username, email, hashedPassword, phone, now, now],
-        type: QueryTypes.INSERT,
-        transaction: t
+        replacements: { username, email, password: hashedPassword, phone },
+        type: QueryTypes.INSERT
       }
     );
 
-    await t.commit();
     res.status(201).json({ 
       success: true, 
       message: '회원가입이 완료되었습니다.' 
     });
   } catch (error) {
-    await t.rollback();
     console.error('회원가입 오류:', error);
     res.status(500).json({ 
       success: false, 
@@ -170,7 +139,7 @@ router.post('/login', async (req: Request, res: Response) => {
     }
 
     // 일반 사용자 로그인 로직은 그 다음에 실행
-    console.log(`로그인 시도: { email: '${email}' }`);
+    console.log('로그인 시도:', { email });
     const [user] = await sequelize.query(
       'SELECT * FROM users WHERE email = :email',
       {

@@ -1,14 +1,18 @@
 {
     "compilerOptions": {
-      "target": "es6",
+      "target": "es2017",
       "module": "commonjs",
+      "lib": ["es2017", "esnext.asynciterable"],
       "outDir": "./dist",
       "rootDir": ".",
       "strict": true,
       "esModuleInterop": true,
       "skipLibCheck": true,
       "forceConsistentCasingInFileNames": true,
-      "moduleResolution": "node"
+      "moduleResolution": "node",
+      "resolveJsonModule": true,
+      "experimentalDecorators": true,
+      "emitDecoratorMetadata": true
     },
     "include": ["./**/*.ts"],
     "exclude": ["node_modules"]

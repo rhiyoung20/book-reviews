@@ -10,10 +10,12 @@ import commentRouter from './routes/comments';
 import userRoutes from './routes/users';
 import sequelize from './config/database';
 import session from 'express-session';
-import RedisStore from 'connect-redis'
-import { createClient } from 'redis';
+import * as connectRedis from 'connect-redis';
 import dotenv from 'dotenv';
-
+import { createClient } from 'redis';
+import './models/User';  // User 모델 임포트
+import './models/emailVerification';  // 추가
+  
 dotenv.config();
 
 // 환경 변수 출력 (디버깅 용도)
@@ -38,31 +40,32 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Redis 클라이언트 설정
-const redisClient = createClient({
+const RedisStore = connectRedis.default(session);
+
+// Redis 설정을 함수로 분리
+const setupRedis = async () => {
+  const redisClient = createClient({
     url: process.env.REDIS_URL || 'redis://localhost:6379'
-});
+  });
 
-// Redis 연결 에러 로깅
-redisClient.on('error', err => console.log('Redis Client Error', err));
+  redisClient.on('error', err => console.log('Redis Client Error', err));
+  await redisClient.connect();
 
-// Redis 연결
-redisClient.connect().catch(console.error);
-
-// 세션 설정
-app.use(session({
+  app.use(session({
+    store: new RedisStore({ 
+      client: redisClient as any,
+      prefix: "myapp:", 
+    }),
     secret: process.env.SESSION_SECRET || 'ptgoras916=25',
     resave: false,
     saveUninitialized: false,
     cookie: {
-        secure: process.env.NODE_ENV === 'production',
-        maxAge: 1000 * 60 * 60 * 24 * 30,
-        httpOnly: true
-    },
-    store: new (RedisStore as any)({ 
-        client: redisClient
-    })
-}));
+      secure: process.env.NODE_ENV === 'production',
+      maxAge: 1000 * 60 * 60 * 24 * 30,
+      httpOnly: true
+    }
+  }));
+};
 
 // 라우트 설정
 app.use('/api/auth', authRoutes);
@@ -80,18 +83,35 @@ app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
 });
 
 // 서버 시작
-const PORT = Number(config.port) || 4000;
+const PORT = Number(process.env.PORT) || 4000;
 
+// 서버 시작 함수 수정
 const startServer = async () => {
   try {
+    await setupRedis();
     await sequelize.authenticate();
-    console.log('MySQL 연결 성공');
+    console.log('PostgreSQL 연결 성공');
     
+    await sequelize.sync({ alter: true });
+    console.log('데이터베이스 테이블 동기화 완료');
+
     app.listen(PORT, () => {
       console.log(`서버가 포트 ${PORT}에서 실행 중입니다.`);
+    }).on('error', (err: any) => {
+      if (err.code === 'EADDRINUSE') {
+        console.log(`포트 ${PORT}가 이미 사용 중입니다. 다른 포트로 시도합니다...`);
+        app.listen(0, () => {  // 0을 지정하면 사용 가능한 랜덤 포트를 할당
+          const addr = app.listen().address();
+          const actualPort = typeof addr === 'string' ? addr : addr?.port;
+          console.log(`서버가 포트 ${actualPort}에서 실행 중입니다.`);
+        });
+      } else {
+        console.error('서버 시작 오류:', err);
+        process.exit(1);
+      }
     });
   } catch (error) {
-    console.error('MySQL 연결 실패:', error);
+    console.error('서버 시작 오류:', error);
     process.exit(1);
   }
 };

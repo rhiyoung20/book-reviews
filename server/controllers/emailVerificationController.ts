@@ -6,6 +6,7 @@ import prisma from '../lib/prisma';
 export const sendVerification = async (req: Request, res: Response): Promise<void> => {
   try {
     const { email } = req.body;
+    console.log('Received email verification request for:', email);
 
     if (!email || !email.trim()) {
       res.status(400).json({ 
@@ -15,17 +16,20 @@ export const sendVerification = async (req: Request, res: Response): Promise<voi
       return;
     }
 
+    console.log('Attempting to send verification email...');
     await sendVerificationEmail(email.trim());
+    console.log('Verification email sent successfully');
     
     res.status(200).json({ 
       success: true, 
       message: '인증 이메일이 발송되었습니다. 이메일을 확인해주세요.' 
     });
   } catch (error) {
-    console.error('이메일 발송 오류:', error);
+    console.error('Detailed email verification error:', error);
     res.status(500).json({ 
       success: false, 
-      message: '이메일 발송 중 오류가 발생했습니다.' 
+      message: '이메일 발송 중 오류가 발생했습니다.',
+      error: process.env.NODE_ENV === 'development' ? (error as Error).message : undefined
     });
   }
 };

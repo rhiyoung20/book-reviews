@@ -118,25 +118,9 @@ export const verifyEmail = async (req: Request, res: Response) => {
   try {
     const { email, verificationCode } = req.body;
 
-    // 인증 코드 확인
-    const [verification] = await sequelize.query(
-      'SELECT * FROM email_verifications WHERE email = ? AND verification_code = ?',
-      {
-        replacements: [email, verificationCode],
-        type: QueryTypes.SELECT
-      }
-    );
-
-    if (!verification) {
-      return res.status(400).json({
-        success: false,
-        message: '유효하지 않은 인증 코드입니다.'
-      });
-    }
-
-    // 인증 상태 업데이트
+    // 사용자 이메일 인증 상태 업데이트
     await sequelize.query(
-      'UPDATE email_verifications SET is_verified = true WHERE email = ?',
+      'UPDATE users SET email_verified = true WHERE email = ?',
       {
         replacements: [email],
         type: QueryTypes.UPDATE,

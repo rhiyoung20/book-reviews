@@ -18,14 +18,13 @@ export default function SignupPage() {
   })
   const [errors, setErrors] = useState<{[key: string]: string}>({})
   const [isLoading, setIsLoading] = useState(false)
-  const [verificationCode, setVerificationCode] = useState('')
   const [isEmailSent, setIsEmailSent] = useState(false)
   const [isEmailVerified, setIsEmailVerified] = useState(false)
   const [isCheckingUsername, setIsCheckingUsername] = useState(false)
   const [isUsernameVerified, setIsUsernameVerified] = useState(false)
   const [isEmailSending, setIsEmailSending] = useState(false)
   const [emailVerificationMessage, setEmailVerificationMessage] = useState('')
-  const [passwordError, setPasswordError] = useState<string>('');
+  const [passwordError, setPasswordError] = useState<string>('')
 
   // 초기 상태값 설정
   const initialFormState = {
@@ -36,13 +35,86 @@ export default function SignupPage() {
     phone: ''
   };
 
-  // 컴포넌트 마운트 시 초기화
+  // 모든 useEffect를 하나로 통합
   useEffect(() => {
-    setFormData(initialFormState);
-    setIsUsernameVerified(false);
-    setIsEmailVerified(false);
-    setErrors({});
-  }, []);
+    const { token, email, verified } = router.query;
+    
+    // 저장된 데이터 복원
+    const savedData = localStorage.getItem('signupFormData');
+    if (savedData) {
+      const parsedData = JSON.parse(savedData);
+      setFormData(prev => ({
+        ...prev,
+        ...parsedData
+      }));
+      
+      // 인증 상태도 복원
+      if (parsedData.isUsernameVerified) {
+        setIsUsernameVerified(true);
+      }
+      if (parsedData.isEmailVerified) {
+        setIsEmailVerified(true);
+      }
+    }
+
+    // 이메일 인증 처리
+    if (verified === 'true' && email && token) {
+      console.log('이메일 인증 처리 시작'); // 디버깅
+      verifyEmailToken(token);
+    }
+  }, [router.query]);
+
+  // 이메일 인증 토큰 검증 함수 수정
+  const verifyEmailToken = async (token: string | string[]) => {
+    const tokenValue = Array.isArray(token) ? token[0] : token;
+    
+    try {
+      const response = await axiosInstance.post('/api/auth/verify-email', { token: tokenValue });
+      
+      if (response.data.success) {
+        // 상태 업데이트
+        setFormData(prev => ({
+          ...prev,
+          email: response.data.email
+        }));
+        setIsEmailVerified(true);
+        
+        // 로컬 스토리지 업데이트
+        const updatedData = {
+          ...formData,
+          email: response.data.email,
+          isEmailVerified: true
+        };
+        localStorage.setItem('signupFormData', JSON.stringify(updatedData));
+        
+        // 성공 메시지 표시
+        alert('이메일 인증이 완료되었습니다.');
+        
+        // 부모 창에 메시지 전달 및 창 닫기
+        if (window.opener) {
+          window.opener.postMessage({ type: 'EMAIL_VERIFIED', email: response.data.email }, '*');
+          window.close();
+        }
+      }
+    } catch (error) {
+      console.error('이메일 인증 실패:', error);
+      alert('이메일 인증에 실패했습니다.');
+    }
+  };
+
+  // 데이터 변경 시 자동 저장
+  useEffect(() => {
+    if (formData.username || formData.email || formData.phone) {
+      const dataToSave = {
+        ...formData,
+        isUsernameVerified,
+        isEmailVerified
+      };
+      localStorage.setItem('signupFormData', JSON.stringify(dataToSave));
+    }
+  }, [formData, isUsernameVerified, isEmailVerified]);
+
+  // handleEmailVerification 함수는 제거 (verifyEmailToken으로 통합)
 
   // 사용자명 중복 체크 - 타임아웃 추가
   const checkUsername = async () => {
@@ -50,7 +122,7 @@ export default function SignupPage() {
       setIsCheckingUsername(true);  // 로딩 상태 시작
       console.log('Checking username:', formData.username); // 디버깅용
 
-      const response = await axiosInstance.post('/auth/check-username', {
+      const response = await axiosInstance.post('/api/auth/check-username', {
         username: formData.username
       });
       
@@ -74,131 +146,15 @@ export default function SignupPage() {
     }
   };
 
-  // 이메일 인증 요청
-  const handleEmailVerification = async () => {
-    try {
-      const response = await axiosInstance.post('http://localhost:4000/api/auth/send-verification', {
-        email: formData.email
-      });
-      
-      if (response.data.success) {
-        alert('인증 이메일이 발송되었습니다. 이메일을 확인해주세요.');
-      }
-    } catch (error) {
-      console.error('이메일 발송 오류:', error);
-      alert('이메일 발송 중 오류가 발생했습니다.');
-    }
-  };
-
-  // 이메일 인증 확인
-  const verifyEmailToken = async (token: string) => {
-    try {
-      const response = await axiosInstance.post('/auth/verify-email', { token });
-      
-      if (response.data.success) {
-        setIsEmailVerified(true);
-        setEmailVerificationMessage('이메일이 성공적으로 인증되었습니다.');
-        setTimeout(() => setEmailVerificationMessage(''), 3000); // 3초 후 메시지 제거
-      }
-    } catch (error: any) {
-      setEmailVerificationMessage(error.response?.data?.message || '이메일 인증에 실패했습니다.');
-      setIsEmailVerified(false);
-    }
-  };
-
-  // useEffect로 URL 파라미터 감지
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const token = params.get('token');
-    const email = params.get('email');
-    
-    if (email) {
-      setFormData(prev => ({
-        ...prev,
-        email: email
-      }));
-    }
-    
-    if (token) {
-      verifyEmailToken(token);
-      // URL에서 토큰 제거
-      const newUrl = window.location.pathname;
-      window.history.replaceState({}, document.title, newUrl);
-    }
-  }, []);
-
-  // 페이지 로드 시 저장된 데이터 복원
-  useEffect(() => {
-    const savedData = localStorage.getItem('signupData');
-    if (savedData) {
-      const parsedData = JSON.parse(savedData);
-      setFormData(prev => ({
-        ...prev,
-        ...parsedData
-      }));
-      if (parsedData.isUsernameVerified) {
-        setIsUsernameVerified(true);
-      }
-    }
-  }, []);
-
-  // 데이터 변경 시 저장
-  useEffect(() => {
-    localStorage.setItem('signupData', JSON.stringify({
-      ...formData,
-      isUsernameVerified
-    }));
-  }, [formData, isUsernameVerified]);
-
-  // handleSubmit 함수
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    try {
-      setIsLoading(true);
-      
-      // 클라이언트 측 유효성 검사
-      if (!isUsernameVerified || !isEmailVerified) {
-        alert('사용자명 중복 확인과 이메일 인증이 필요합니다.');
-        return;
-      }
-
-      // 비밀번호 확인
-      if (formData.password !== formData.confirmPassword) {
-        alert('비밀번호가 일치하지 않습니다.');
-        return;
-      }
-
-      const response = await axiosInstance.post('/auth/signup', {
-        username: formData.username,
-        email: formData.email,
-        password: formData.password,
-        phone: formData.phone
-      });
-
-      if (response.data.success) {
-        alert('회원가입이 완료되었습니다.');
-        // 로컬 스토리지의 임시 데이터 삭제
-        localStorage.removeItem('signupData');
-        router.push('/login');
-      }
-    } catch (error: any) {
-      console.error('회원가입 오류:', error);
-      alert(error.response?.data?.message || '회원가입 중 오류가 발생했습니다.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   // 이메일 인증 메시지 수신 처리
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
-      if (event.origin === process.env.NEXT_PUBLIC_API_URL) {
-        if (event.data.type === 'EMAIL_VERIFIED') {
-          setIsEmailVerified(true);
-          setEmailVerificationMessage('이메일이 성공적으로 인증되었습니다.');
-          setTimeout(() => setEmailVerificationMessage(''), 3000);
-        }
+      if (event.data.type === 'EMAIL_VERIFIED') {
+        setIsEmailVerified(true);
+        setFormData(prev => ({
+          ...prev,
+          email: event.data.email
+        }));
       }
     };
 
@@ -231,6 +187,95 @@ export default function SignupPage() {
     }
   };
 
+  // saveFormData 유틸리티 함수 추가
+  const saveFormData = (data: any) => {
+    localStorage.setItem('signupFormData', JSON.stringify(data));
+  };
+
+  // 새로운 이메일 인증 요청 함수 추가
+  const requestEmailVerification = async () => {
+    if (isEmailSending) return;  // 이미 처리 중이면 중복 요청 방지
+
+    try {
+      setIsEmailSending(true);
+      console.log('Sending verification email to:', formData.email); // 디버깅용
+
+      const response = await axiosInstance.post('/api/auth/send-verification', {
+        email: formData.email
+      });
+      
+      if (response.data.success) {
+        alert('인증 이메일이 발송되었습니다. 이메일을 확인해주세요.');
+        setIsEmailSent(true);
+      }
+    } catch (error: any) {
+      console.error('이메일 발송 오류:', error);
+      alert(error.response?.data?.message || '이메일 발송에 실패했습니다.');
+    } finally {
+      setIsEmailSending(false);
+    }
+  };
+
+  // handleSubmit 함수 수정
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    console.log('회원가입 시도', { formData, isEmailVerified, isUsernameVerified }); // 디버깅
+    
+    // 유효성 검사
+    const validationErrors: {[key: string]: string} = {};
+    
+    if (!isUsernameVerified) {
+      validationErrors.username = '사용자명 중복 확인이 필요합니다.';
+    }
+    if (!isEmailVerified) {
+      validationErrors.email = '이메일 인증이 필요합니다.';
+    }
+    if (!formData.password || formData.password !== formData.confirmPassword) {
+      validationErrors.password = '비밀번호가 일치하지 않습니다.';
+    }
+    if (!formData.phone) {
+      validationErrors.phone = '전화번호를 입력해주세요.';
+    }
+    
+    if (Object.keys(validationErrors).length > 0) {
+      setErrors(validationErrors);
+      console.log('유효성 검사 실패:', validationErrors); // 디버깅
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      console.log('서버로 회원가입 요청 전송'); // 디버깅
+
+      const response = await axiosInstance.post('/api/auth/signup', {
+        username: formData.username,
+        email: formData.email,
+        password: formData.password,
+        phone: formData.phone
+      });
+
+      console.log('서버 응답:', response.data); // 디버깅
+
+      if (response.data.success) {
+        localStorage.removeItem('signupFormData');
+        alert(`환영합니다, ${formData.username}님!`);
+        router.push('/login');
+      }
+    } catch (error: any) {
+      console.error('회원가입 오류:', error);
+      alert(error.response?.data?.message || '회원가입 중 오류가 발생했습니다.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // 페이지 이동 시 데이터 클리어
+  useEffect(() => {
+    return () => {
+      localStorage.removeItem('signupFormData');
+    };
+  }, []);
+
   return (
     <div className="container mx-auto px-4 py-8">
       <Header hideAuthButtons={true} />
@@ -262,10 +307,18 @@ export default function SignupPage() {
                 type="button"
                 variant="solid"
                 onClick={checkUsername}
-                disabled={isCheckingUsername}
-                className="w-32"
+                disabled={isCheckingUsername || isUsernameVerified}
+                className={`w-32 ${
+                  isUsernameVerified 
+                    ? 'bg-green-500 hover:bg-green-600' 
+                    : 'bg-blue-500 hover:bg-blue-600'
+                }`}
               >
-                {isCheckingUsername ? '확인 중...' : '중복 확인'}
+                {isUsernameVerified 
+                  ? '확인 완료' 
+                  : isCheckingUsername 
+                    ? '확인 중...' 
+                    : '중복 확인'}
               </Button>
             </div>
             <div className="mt-4 mb-2 text-sm text-gray-600">              
@@ -292,21 +345,19 @@ export default function SignupPage() {
               <Button
                 type="button"
                 variant="solid"
-                onClick={handleEmailVerification}
-                disabled={isEmailSending || isEmailVerified}
-                className={`px-4 py-2 text-white font-bold rounded ${
+                onClick={requestEmailVerification}
+                disabled={isEmailSending || isEmailVerified || !formData.email}
+                className={`w-full ${
                   isEmailVerified 
-                    ? 'bg-green-500 cursor-not-allowed' 
-                    : isEmailSending 
-                      ? 'bg-gray-400 cursor-not-allowed'
-                      : 'bg-blue-500 hover:bg-blue-700'
+                    ? 'bg-green-500 hover:bg-green-600' 
+                    : 'bg-blue-500 hover:bg-blue-600'
                 }`}
               >
                 {isEmailVerified 
-                  ? '인증완료' 
+                  ? '인증 완료' 
                   : isEmailSending 
-                    ? '발송중...' 
-                    : '이메일 인증하기'}
+                    ? '처리 중...' 
+                    : '이메일로 인증하기'}
               </Button>
             </div>
           </div>

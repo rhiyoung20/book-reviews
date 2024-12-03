@@ -59,6 +59,9 @@ export const getReviews = async (req: Request, res: Response) => {
         };
       }
   
+      console.log('Query parameters:', { page, searchType, searchTerm });
+      console.log('Where clause:', whereClause);
+
       const { count, rows: reviews } = await Review.findAndCountAll({
         where: whereClause,
         attributes: [
@@ -73,6 +76,8 @@ export const getReviews = async (req: Request, res: Response) => {
         offset
       });
   
+      console.log('Found reviews:', reviews.length);
+
       return res.json({
         reviews: reviews.map(review => review.get({ plain: true })),
         currentPage: page,
@@ -80,9 +85,10 @@ export const getReviews = async (req: Request, res: Response) => {
         totalReviews: count
       });
     } catch (error) {
-      console.error('리뷰 목록 조회 오류:', error);
+      console.error('상세 에러 정보:', error);
       return res.status(500).json({ 
-        message: '리뷰 목록을 불러오는 중 오류가 발생했습니다.' 
+        message: '리뷰 목록을 불러오는 중 오류가 발생했습니다.',
+        error: error instanceof Error ? error.message : '알 수 없는 오류'
       });
     }
   };

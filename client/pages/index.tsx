@@ -14,7 +14,6 @@ interface Review {
   username: string;
   createdAt: string;
   views: number;
-  displayNumber: number;
 }
 
 interface ReviewsResponse {
@@ -46,21 +45,29 @@ function HomeComponent() {
       setIsLoading(true);
       setError(null);
       
-      let url = `/reviews?page=${page}`;
+      let url = `/api/reviews?page=${page}`;
       if (type && term) {
         url += `&type=${type}&term=${encodeURIComponent(term)}`;
       }
       
+      console.log('요청 URL:', url);
       const response = await axiosInstance.get<ReviewsResponse>(url);
+      console.log('서버 응답:', response.data);
+      
       setReviews(response.data.reviews);
       setTotalPages(response.data.totalPages);
       setCurrentPage(page);
       setTotalResults(response.data.totalReviews);
+      
+      if (response.data.reviews.length === 0 && !term) {
+        setError('등록된 리뷰가 없습니다.');
+      }
     } catch (err: any) {
-      console.error('리뷰 목록 조회 오류:', err);
-      setReviews([]);
-      setTotalResults(0);
-      setError('리뷰 목록을 불러오는데 실패했습니다.');
+      console.error('리뷰 목록 조회 오류:', err.response || err);
+      setError(
+        err.response?.data?.message || 
+        '리뷰 목록을 불러오는데 실패했습니다. 잠시 후 다시 시도해주세요.'
+      );
     } finally {
       setIsLoading(false);
     }
@@ -104,15 +111,8 @@ function HomeComponent() {
 
   useEffect(() => {
     const currentPage = parseInt(page as string) || 1;
-    
-    if (type && term && isSearched) {
-      setSearchTerm(term as string);
-      setSearchType(type as 'title' | 'username');
-      fetchReviews(currentPage, type as string, term as string);
-    } else if (!type && !term) {
-      fetchReviews(currentPage);
-    }
-  }, [router.query, isSearched]);
+    fetchReviews(currentPage);
+  }, []);
 
   const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
