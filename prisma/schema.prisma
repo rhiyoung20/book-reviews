@@ -8,45 +8,41 @@ datasource db {
 }
 
 model User {
-  id        Int       @id @default(autoincrement())
-  username  String    @unique
-  email     String    @unique
-  password  String
-  phone     String?
-  email_verified Boolean   @default(false)
-  isAdmin   Boolean   @default(false)
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  reviews   Review[]
+  id         Int       @id @default(autoincrement())
+  username   String    @unique
+  socialId   String?   @unique
+  socialType String?
+  email      String?   @unique
+  password   String?
+  isAdmin    Boolean   @default(false)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  reviews    Review[]
+  comments   Comment[]
 }
 
 model Review {
   id        Int       @id @default(autoincrement())
-  title     String
-  content   String
-  userId    Int
-  user      User      @relation(fields: [userId], references: [id])
+  title     String    // 리뷰 제목
+  bookTitle String    // 책 제목
+  content   String    // 리뷰 내용
+  views     Int       @default(0)
+  username  String    // userId 대신 username으로 변경
+  user      User      @relation(fields: [username], references: [username])
+  comments  Comment[]
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
-  comments  Comment[]
 }
 
 model Comment {
   id        Int      @id @default(autoincrement())
   content   String
+  username  String
   reviewId  Int
-  review    Review   @relation(fields: [reviewId], references: [id])
+  parentId  Int?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  review    Review   @relation(fields: [reviewId], references: [id])
+  user      User     @relation(fields: [username], references: [username])
 }
 
-model EmailVerification {
-  id        Int      @id @default(autoincrement())
-  email     String
-  token     String   @unique
-  verified  Boolean  @default(false)
-  expiresAt DateTime
-  createdAt DateTime @default(now())
-
-  @@index([email])
-}

@@ -1,41 +1,21 @@
-import React, { useState, useContext } from 'react'
+import React, { useContext } from 'react'
 import { Button } from "../components/ui/Button"
-import { Input } from "../components/ui/Input"
-import { Label } from "../components/ui/Label"
-import axios from "axios"
 import Link from 'next/link'
 import { useRouter } from 'next/router'
-import axiosInstance from '../utils/axios'
 import { UserContext } from '../context/UserContext'
 
 const Login: React.FC = () => {
   const router = useRouter()
   const { returnUrl } = router.query
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [username, setUsername] = useState('')
-  const [isAdmin, setIsAdmin] = useState(false)
   const { setUsername: setContextUsername } = useContext(UserContext)
 
-  const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
-    try {
-      const response = await axiosInstance.post('/auth/login', { email, password })
-      const { token, user } = response.data
-      
-      localStorage.setItem('token', token)
-      localStorage.setItem('username', user.username)
-      localStorage.setItem('isAdmin', user.isAdmin.toString())
-      setContextUsername(user.username)
-      setUsername(user.username)
-      setIsAdmin(user.isAdmin)
-      alert(`${user.username}님 환영합니다.`)
-      
-      router.push(returnUrl as string || '/')
-    } catch (error: any) {
-      console.error('로그인 오류:', error)
-      alert('이메일 또는 비밀번호가 올바르지 않습니다.')
-    }
+  // 소셜 로그인 성공 후 처리
+  const handleSocialLoginSuccess = (user: any) => {
+    localStorage.setItem('token', user.token)
+    localStorage.setItem('username', user.username)
+    setContextUsername(user.username)
+    alert(`${user.username}님 환영합니다.`)
+    router.push(returnUrl as string || '/')
   }
 
   return (
@@ -45,39 +25,21 @@ const Login: React.FC = () => {
       </header>
 
       <div className="max-w-md mx-auto">
-        <form onSubmit={handleLogin} className="space-y-4 text-sm">
-          <div>
-            <Label htmlFor="email">이메일</Label>
-            <Input 
-              id="email" 
-              type="email" 
-              placeholder="이메일을 입력하세요" 
-              value={email}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEmail(e.target.value)}
-              required
-            />
-          </div>
-          <div>
-            <Label htmlFor="password">비밀번호</Label>
-            <Input 
-              id="password" 
-              type="password" 
-              placeholder="비밀번호를 입력하세요" 
-              value={password}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPassword(e.target.value)}
-              required
-            />
-          </div>
-          <Button type="submit" variant="solid" className="w-full bg-gray-500 hover:bg-gray-600">로그인</Button>
-        </form>
-        <div className="mt-4 text-center text-sm">
-          <Link href="/signup" className="text-blue-600 hover:underline">
-            회원가입
-          </Link>
-          <span className="mx-2">|</span>
-          <Link href="/forgot-password" className="text-blue-600 hover:underline">
-            비밀번호 찾기
-          </Link>
+        <div className="space-y-4">
+          <Button 
+            variant="solid"
+            onClick={() => {/* 구글 로그인 로직 */}} 
+            className="w-full bg-white text-gray-700 border border-gray-300"
+          >
+            구글로 로그인
+          </Button>
+          <Button 
+            variant="solid"
+            onClick={() => {/* 카카오 로그인 로직 */}} 
+            className="w-full bg-yellow-300 text-gray-900"
+          >
+            카카오로 로그인
+          </Button>
         </div>
       </div>
     </div>

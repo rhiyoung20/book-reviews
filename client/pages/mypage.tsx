@@ -1,14 +1,10 @@
-import { useState, useEffect, useContext, useRef } from 'react'
+import { useState, useEffect, useContext } from 'react'
 import { Button } from "@/components/ui/Button"
-import { Input } from "@/components/ui/Input"
-import { Label } from "@/components/ui/Label"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/Tabs"
-import Link from 'next/link'
-import axios from 'axios'
 import Header from '@/components/Header'
 import { UserContext } from '@/context/UserContext'
 import { useRouter } from 'next/router'
 import axiosInstance from '@/utils/axios'
+import Link from 'next/link'
 
 interface Review {
   id: number;
@@ -27,12 +23,12 @@ interface Comment {
 
 interface ReviewResponse {
   reviews: Review[];
-  total: number;  // 전체 리뷰 수
+  total: number;
 }
 
 interface CommentResponse {
   comments: Comment[];
-  total: number;  // 전체 댓글 수
+  total: number;
 }
 
 export default function MyPage() {
@@ -41,11 +37,6 @@ export default function MyPage() {
   const [userReviews, setUserReviews] = useState<Review[]>([])
   const [userComments, setUserComments] = useState<Comment[]>([])
   const router = useRouter()
-  const dataFetchedRef = useRef(false);
-  const [currentPassword, setCurrentPassword] = useState('')
-  const [newPassword, setNewPassword] = useState('')
-  const [confirmPassword, setConfirmPassword] = useState('')
-  const [passwordMessage, setPasswordMessage] = useState('')
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const ITEMS_PER_PAGE = 5;
@@ -140,30 +131,6 @@ export default function MyPage() {
     }
   };
 
-  const handlePasswordChange = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (newPassword !== confirmPassword) {
-      setPasswordMessage('새 비밀번호가 일치하지 않습니다.')
-      return
-    }
-
-    try {
-      const response = await axiosInstance.put('/auth/change-password', {
-        currentPassword,
-        newPassword
-      })
-      
-      if (response.data.success) {
-        setPasswordMessage('비밀번호가 성공적으로 변경되었습니다.')
-        setCurrentPassword('')
-        setNewPassword('')
-        setConfirmPassword('')
-      }
-    } catch (error) {
-      setPasswordMessage('비밀번호 변경에 실패했습니다.')
-    }
-  }
-
   const handlePageChange = async (newPage: number) => {
     const token = localStorage.getItem('token');
     
@@ -211,45 +178,6 @@ export default function MyPage() {
       <Header />
       <div className="mt-20 flex justify-center">
         <div className="w-full max-w-2xl">
-          <div className="mb-8">
-            <h2 className="text-xl font-bold mb-4">비밀번호 변경</h2>
-            <form onSubmit={handlePasswordChange} className="space-y-4">
-              <div>
-                <Label htmlFor="currentPassword">현재 비밀번호</Label>
-                <Input
-                  id="currentPassword"
-                  type="password"
-                  value={currentPassword}
-                  onChange={(e) => setCurrentPassword(e.target.value)}
-                />
-              </div>
-              <div>
-                <Label htmlFor="newPassword">새 비밀번호</Label>
-                <Input
-                  id="newPassword"
-                  type="password"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                />
-              </div>
-              <div>
-                <Label htmlFor="confirmPassword">새 비밀번호 확인</Label>
-                <Input
-                  id="confirmPassword"
-                  type="password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                />
-              </div>
-              {passwordMessage && (
-                <p className={`text-sm ${passwordMessage.includes('성공') ? 'text-green-600' : 'text-red-600'}`}>
-                  {passwordMessage}
-                </p>
-              )}
-              <Button type="submit" variant="solid">비밀번호 변경</Button>
-            </form>
-          </div>
-
           <div className="flex justify-center mb-4">
             <div className="w-1/2 flex space-x-2">
               <Button 
@@ -341,5 +269,5 @@ export default function MyPage() {
         <p>책익는 마을 관리자에게 문의하기: <a href="mailto:rhiyoung@naver.com" className="text-blue-600 hover:underline">rhiyoung@naver.com</a></p>
       </footer>
     </div>
-  );
+  )
 }

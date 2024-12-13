@@ -1,7 +1,6 @@
 import express from 'express';
-import { Router } from 'express';
-import type { Request, Response, NextFunction } from 'express-serve-static-core';
-import { verifyToken } from '../middleware/auth';
+import type { Response, RequestHandler } from 'express';
+import { CustomRequest } from '../types/auth';
 import {
   createComment,
   deleteComment,
@@ -9,23 +8,44 @@ import {
   updateComment,
   getUserComments
 } from '../controllers/commentController';
-import { CustomRequest } from '../middleware/auth';
+import verifyToken from '../middleware/auth';
 
 const router = express.Router();
 
+// 타입 안전한 비동기 핸들러
+const asyncHandler = (
+  fn: (req: CustomRequest, res: Response) => Promise<Response | void | undefined>
+): RequestHandler => {
+  return (req, res, next): void => {
+    Promise.resolve(fn(req as CustomRequest, res)).catch((error: unknown) => next(error));
+  };
+};
+
 // 사용자별 댓글 목록 조회 (로그인 필요)
-router.get('/user/:username', verifyToken, getUserComments);
+router.get('/user/:username', 
+  verifyToken as RequestHandler,
+  asyncHandler(getUserComments)
+);
 
 // 리뷰별 댓글 목록 조회
-router.get('/:reviewId', getComments);
+router.get('/:reviewId', asyncHandler(getComments));
 
 // 댓글 작성
-router.post('/:reviewId', verifyToken, createComment);
+router.post('/:reviewId', 
+  verifyToken as RequestHandler,
+  asyncHandler(createComment)
+);
 
 // 댓글 수정
-router.put('/:id', verifyToken, updateComment);
+router.put('/:id', 
+  verifyToken as RequestHandler,
+  asyncHandler(updateComment)
+);
 
 // 댓글 삭제
-router.delete('/:id', verifyToken, deleteComment);
+router.delete('/:id', 
+  verifyToken as RequestHandler,
+  asyncHandler(deleteComment)
+);
 
 export default router;

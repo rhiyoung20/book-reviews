@@ -1,121 +1,115 @@
 import express from 'express';
-import type { Express, Request, Response, NextFunction } from 'express-serve-static-core';
 import cors from 'cors';
-import connectDB from './config/database';  // { connectDB }가 아닌 default import 사용
-import pool from './config/database';
-import config from './config/config';
+import passport from 'passport';
+import session from 'express-session';
+import { PrismaClient } from '@prisma/client';
+import dotenv from 'dotenv';
 import authRoutes from './routes/auth';
 import reviewRoutes from './routes/reviews';
-import commentRouter from './routes/comments';
-import userRoutes from './routes/users';
-import sequelize from './config/database';
-import session from 'express-session';
-import * as connectRedis from 'connect-redis';
-import dotenv from 'dotenv';
-import { createClient } from 'redis';
-import './models/User';  // User 모델 임포트
-import './models/emailVerification';  // 추가
-  
-dotenv.config();
+import commentRoutes from './routes/comments';
+import path from 'path';
 
-// 환경 변수 출력 (디버깅 용도)
-console.log('Environment Variables:');
-console.log('ADMIN_USERNAME:', process.env.ADMIN_USERNAME);
-console.log('ADMIN_PASSWORD:', process.env.ADMIN_PASSWORD);
-console.log('JWT_SECRET:', process.env.JWT_SECRET);
-console.log('SESSION_SECRET:', process.env.SESSION_SECRET);
-console.log('EMAIL_USER:', process.env.EMAIL_USER);
-console.log('EMAIL_PASS:', process.env.EMAIL_PASS?.substring(0, 4) + '...'); // 보안을 위해 일부만 출력
+// 환경변수 로드
+dotenv.config();
+console.log('현재 디렉토리:', __dirname);
+console.log('환경변수 확인:', {
+  GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
+  GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET
+});
+
+// 다른 파일에서 환경변수를 사용하기 전에 여기서 한 번만 검사하도록 수정
+if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
+  console.warn('Google OAuth credentials not found in environment variables');
+}
 
 const app = express();
+const prisma = new PrismaClient();
 
-// CORS 설정 수정
-app.use(cors({
-  origin: 'http://localhost:3000', // 프론트엔드 주소
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true
-}));
+// DB 연결 확인
+async function connectDB() {
+  try {
+    await prisma.$connect();
+    
+    // DATABASE_URL 파싱
+    const dbUrl = process.env.DATABASE_URL || '';
+    const dbInfo = {
+      database: dbUrl.split('/').pop()?.split('?')[0],
+      host: dbUrl.split('@')[1]?.split(':')[0],
+      port: dbUrl.split(':').pop()?.split('/')[0],
+      user: dbUrl.split('://')[1]?.split(':')[0]
+    };
+    
+    console.log('데이터베이스 연결 정보:', dbInfo);
+    
+    // 테이블 목록 확인
+    const tables = await prisma.$queryRaw`
+      SELECT table_name 
+      FROM information_schema.tables 
+      WHERE table_schema = 'public'
+    `;
+    console.log('사용 가능한 테이블:', tables);
+    
+    return true;
+  } catch (error) {
+    console.error('데이터베이스 연결 실패:', error);
+    return false;
+  }
+}
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// 서버 시작 함수
+async function startServer() {
+  const isConnected = await connectDB();
+  if (!isConnected) {
+    console.error('서버를 시작할 수 없습니다: 데이터베이스 연결 실패');
+    return;
+  }
 
-const RedisStore = connectRedis.default(session);
+  // CORS 설정
+  app.use(cors({
+    origin: process.env.NEXT_PUBLIC_FRONTEND_URL || 'http://localhost:3000',
+    credentials: true
+  }));
 
-// Redis 설정을 함수로 분리
-const setupRedis = async () => {
-  const redisClient = createClient({
-    url: process.env.REDIS_URL || 'redis://localhost:6379'
-  });
-
-  redisClient.on('error', err => console.log('Redis Client Error', err));
-  await redisClient.connect();
-
+  // 미들웨어 설정
+  app.use(express.json());
   app.use(session({
-    store: new RedisStore({ 
-      client: redisClient as any,
-      prefix: "myapp:", 
-    }),
-    secret: process.env.SESSION_SECRET || 'ptgoras916=25',
+    secret: process.env.SESSION_SECRET || 'your-secret-key',
     resave: false,
     saveUninitialized: false,
     cookie: {
       secure: process.env.NODE_ENV === 'production',
-      maxAge: 1000 * 60 * 60 * 24 * 30,
-      httpOnly: true
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+      maxAge: 24 * 60 * 60 * 1000 // 24시간
     }
   }));
-};
 
-// 라우트 설정
-app.use('/api/auth', authRoutes);
-app.use('/api/reviews', reviewRoutes);
-app.use('/api/comments', commentRouter);
-app.use('/users', userRoutes);
+  // Passport 설정
+  app.use(passport.initialize());
+  app.use(passport.session());
+  
+  // Passport 설정 파일 import
+  const configurePassport = require('./config/passport').default;
+  configurePassport(passport);
 
-// 에러 핸들링
-app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
-  console.error(err.stack);
-  res.status(500).json({ 
-    success: false, 
-    message: '서버 오류가 발생했습니다.' 
+  // 라우트 설정
+  app.use('/api/auth', authRoutes);
+  app.use('/api/reviews', reviewRoutes);
+  app.use('/api/comments', commentRoutes);
+
+  const PORT = process.env.PORT || 4000;
+  app.listen(PORT, () => {
+    console.log(`서버가 포트 ${PORT}에서 실행 중입니다.`);
   });
-});
+}
 
 // 서버 시작
-const PORT = Number(process.env.PORT) || 4000;
+startServer().catch(error => {
+  console.error('서버 시작 중 오류 발생:', error);
+});
 
-// 서버 시작 함수 수정
-const startServer = async () => {
-  try {
-    await setupRedis();
-    await sequelize.authenticate();
-    console.log('PostgreSQL 연결 성공');
-    
-    await sequelize.sync({ alter: true });
-    console.log('데이터베이스 테이블 동기화 완료');
-
-    app.listen(PORT, () => {
-      console.log(`서버가 포트 ${PORT}에서 실행 중입니다.`);
-    }).on('error', (err: any) => {
-      if (err.code === 'EADDRINUSE') {
-        console.log(`포트 ${PORT}가 이미 사용 중입니다. 다른 포트로 시도합니다...`);
-        app.listen(0, () => {  // 0을 지정하면 사용 가능한 랜덤 포트를 할당
-          const addr = app.listen().address();
-          const actualPort = typeof addr === 'string' ? addr : addr?.port;
-          console.log(`서버가 포트 ${actualPort}에서 실행 중입니다.`);
-        });
-      } else {
-        console.error('서버 시작 오류:', err);
-        process.exit(1);
-      }
-    });
-  } catch (error) {
-    console.error('서버 시작 오류:', error);
-    process.exit(1);
-  }
-};
-
-startServer();
+// 프로세스 종료 시 DB 연결 해제
+process.on('beforeExit', async () => {
+  await prisma.$disconnect();
+});
 
 export default app;

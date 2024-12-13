@@ -28,9 +28,7 @@ function HomeComponent() {
   const { page = '1', type, term } = router.query;
   const { checkAuthStatus } = useContext(UserContext);
 
-  const [searchType, setSearchType] = useState<'title' | 'username'>(
-    (type as 'title' | 'username') || 'title'
-  );
+  const [searchType, setSearchType] = useState<'title' | 'username'>('title');
   const [searchTerm, setSearchTerm] = useState('');
   const [reviews, setReviews] = useState<Review[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
@@ -39,6 +37,12 @@ function HomeComponent() {
   const [error, setError] = useState<string | null>(null);
   const [totalResults, setTotalResults] = useState<number>(0);
   const [isSearched, setIsSearched] = useState(false);
+
+  useEffect(() => {
+    if (type) {
+      setSearchType(type as 'title' | 'username');
+    }
+  }, [type]);
 
   const fetchReviews = async (page: number, type?: string, term?: string) => {
     try {
@@ -111,8 +115,13 @@ function HomeComponent() {
 
   useEffect(() => {
     const currentPage = parseInt(page as string) || 1;
-    fetchReviews(currentPage);
-  }, []);
+    
+    if (isSearched && type && term) {
+      fetchReviews(currentPage, type as string, term as string);
+    } else if (!isSearched) {
+      fetchReviews(currentPage);
+    }
+  }, [page, isSearched]);
 
   const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {

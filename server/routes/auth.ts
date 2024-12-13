@@ -1,192 +1,219 @@
 import express, { Request, Response, NextFunction } from 'express';
+import passport from 'passport';
 import jwt from 'jsonwebtoken';
-import bcrypt from 'bcryptjs';
+import prisma from '../lib/prisma';
 import config from '../config/config';
-import sequelize from '../config/database';
-import { QueryTypes } from 'sequelize';
-import { sendVerification, verifyEmail as verifyEmailController } from '../controllers/emailVerificationController';
-import { CustomRequest } from '../middleware/auth';
-import { generateTempPassword, sendTempPasswordEmail } from '../utils/email';
-import { 
-  login, 
-  verifyEmail, 
-  checkUsername,
-  verifyAuth  // 추가
-} from '../controllers/authController';
-import { verifyToken } from '../middleware/auth';  // 이걸로 통일
-import { PrismaClient } from '@prisma/client';
+import { CustomRequest } from '../types/auth';
+import { Session } from 'express-session';
+import { Strategy as GoogleStrategy, VerifyCallback, Profile } from 'passport-google-oauth20';
+
+// 세션 타입 확장
+declare module 'express-session' {
+  interface Session {
+    state?: string;
+  }
+}
 
 const router = express.Router();
 
-// JWT 시크릿 키 설정
-const JWT_SECRET = process.env.JWT_SECRET || 'ptgoras916=25';
+// 새 사용자용 타입 정의
+type NewSocialUser = {
+  socialId: string;
+  isNewUser: boolean;
+};
 
-// 환경 변수 출력 (디버깅 용도)
-console.log('ADMIN_USERNAME:', process.env.ADMIN_USERNAME);
-console.log('ADMIN_PASSWORD:', process.env.ADMIN_PASSWORD);
+// 환경변수 확인 및 Passport 설정
+if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
+  console.warn('Google OAuth credentials not configured. Social login will be disabled.');
+}
 
-// 사용자명 중복 체크
+// JWT 토큰 생성 함수
+const generateToken = (user: { id: number; username: string; isAdmin: boolean }) => {
+  return jwt.sign(
+    { 
+      id: user.id, 
+      username: user.username,
+      isAdmin: user.isAdmin 
+    },
+    process.env.JWT_SECRET!,
+    { expiresIn: '1d' }
+  );
+};
+
+// 에러 응답 헬퍼 함수 추가
+const sendError = (res: Response, status: number, message: string) => {
+  return res.status(status).json({
+    success: false,
+    message
+  });
+};
+
+// 사용자명 중복 확인
 router.post('/check-username', async (req: Request, res: Response) => {
   try {
     const { username } = req.body;
-    console.log('Checking username:', username); // 디버깅 로그 추가
-    
     if (!username) {
+      return sendError(res, 400, '사용자명이 필요합니다.');
+    }
+    
+    console.log('사용자명 중복 확인 요청:', username);
+    
+    const existingUser = await prisma.user.findUnique({
+      where: { username }
+    });
+
+    res.json({
+      success: true,
+      exists: !!existingUser
+    });
+  } catch (error) {
+    console.error('사용자명 확인 오류:', error);
+    return sendError(res, 500, '사용자명 확인 중 오류가 발생했습니다.');
+  }
+});
+
+// Google 로그인 시작
+router.get('/google',
+  passport.authenticate('google', { scope: ['profile', 'email'] })
+);
+
+// username 상태 저장
+router.post('/set-state', (req: Request, res: Response) => {
+  try {
+    const { state } = req.body;
+    if (req.session) {
+      req.session.state = state;
+      console.log('세션 저장 완료:', state);
+      res.json({ success: true });
+    } else {
+      throw new Error('세션이 초기화되지 않았습니다.');
+    }
+  } catch (error) {
+    console.error('상태 저장 오류:', error);
+    res.status(500).json({
+      success: false,
+      message: '상태 저장 중 오류가 발생했습니다.'
+    });
+  }
+});
+
+// Google 로그인 콜백
+router.get('/google/callback',
+  passport.authenticate('google', { 
+    session: false,
+    failureRedirect: `${process.env.FRONTEND_URL}/login?error=social_account_exists` 
+  }),
+  async (req: Request, res: Response) => {
+    try {
+      console.log('인증 후 콜백 진입');
+      const user = (req as CustomRequest).user;
+      
+      if (!user) {
+        return res.redirect(`${process.env.FRONTEND_URL}/login?error=no_user`);
+      }
+
+      // JWT 토큰 생성 전에 JWT_SECRET 확인
+      if (!process.env.JWT_SECRET) {
+        console.error('JWT_SECRET is not defined');
+        return res.redirect(`${process.env.FRONTEND_URL}/login?error=server_config_error`);
+      }
+
+      const token = jwt.sign(
+        {
+          id: user.id,
+          username: user.username,
+          isAdmin: user.isAdmin || false
+        },
+        process.env.JWT_SECRET,
+        { expiresIn: '1d' }
+      );
+
+      // 성공 시 토큰과 함께 홈페이지로 리다이렉트
+      return res.redirect(`${process.env.FRONTEND_URL}/?token=${token}&username=${user.username}&status=success`);
+    } catch (error) {
+      console.error('Google 콜백 처리 오류:', error);
+      return res.redirect(`${process.env.FRONTEND_URL}/login?error=callback_failed`);
+    }
+  }
+);
+
+// 소셜 회원가입 완료
+router.post('/complete-social-signup', async (req: Request, res: Response) => {
+  try {
+    const { username, socialId } = req.body;
+
+    // username 중복 확인
+    const existingUser = await prisma.user.findUnique({
+      where: { username }
+    });
+
+    if (existingUser) {
       return res.status(400).json({
         success: false,
-        message: '사용자명이 제공되지 않았습니다.'
+        message: '이미 사용 중인 필명입니다.'
       });
     }
 
-    const [result] = await sequelize.query(
-      'SELECT COUNT(*) as count FROM users WHERE username = :username',
-      {
-        replacements: { username },
-        type: QueryTypes.SELECT
+    // 새 사용자 생성
+    const user = await prisma.user.create({
+      data: {
+        username,
+        socialId,
+        socialType: 'google',
+        isAdmin: false
       }
-    );
+    });
 
-    const count = (result as any).count;
-    console.log('Username check result:', count); // 디버깅 로그 추가
-    
+    // 토큰 생성
+    const token = generateToken(user);
+
     res.json({
       success: true,
-      exists: count > 0,
-      message: count > 0 ? '이미 사용 중인 사용자명입니다.' : '사용 가능한 사용자명입니다.'
+      token,
+      username: user.username
     });
   } catch (error) {
-    console.error('사용자명 중복 체크 오류:', error);
+    console.error('소셜 회원가입 완료 오류:', error);
     res.status(500).json({
       success: false,
-      message: '사용자명 확인 중 오류가 발생했습니다.'
+      message: '회원가입 처리 중 오류가 발생했습니다.'
     });
   }
 });
 
-// 이메일 인증 메일 발송
-router.post('/send-verification', sendVerification);
-
-// 이메일 인증 확인
-router.post('/verify-email', verifyEmailController);
-
-// 회원가입
-router.post('/signup', async (req: Request, res: Response) => {
+// 관리자 로그인
+router.post('/admin-login', async (req: Request, res: Response) => {
   try {
-    const { username, email, password, phone } = req.body;
-    
-    // 비밀번호 해시화
-    const hashedPassword = await bcrypt.hash(password, 10);
+    const { username, password } = req.body;
 
-    await sequelize.query(
-      `INSERT INTO users (
-        username, 
-        email, 
-        password, 
-        phone
-      ) VALUES (
-        :username,
-        :email,
-        :password,
-        :phone
-      )`,
-      {
-        replacements: { username, email, password: hashedPassword, phone },
-        type: QueryTypes.INSERT
-      }
-    );
-
-    res.status(201).json({ 
-      success: true, 
-      message: '회원가입이 완료되었습니다.' 
-    });
-  } catch (error) {
-    console.error('회원가입 오류:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: '회원가입 처리 중 오류가 발생했습니다.' 
-    });
-  }
-});
-
-// 로그인
-router.post('/login', async (req: Request, res: Response) => {
-  try {
-    const { email, password } = req.body;
-
-    // 관리자 계정 확인을 먼저 수행
-    if (email === process.env.ADMIN_USERNAME && password === process.env.ADMIN_PASSWORD) {
-      console.log('관리자 로그인 시도');
+    if (username === process.env.ADMIN_USERNAME && 
+        password === process.env.ADMIN_PASSWORD) {
       const token = jwt.sign(
         { 
           id: 0,
           username: 'admin',
           isAdmin: true 
         },
-        JWT_SECRET,
-        { expiresIn: '24h' }
+        process.env.JWT_SECRET!,
+        { expiresIn: '1d' }
       );
 
       return res.json({
         success: true,
         token,
         user: {
-          id: 0,
           username: 'admin',
-          email: process.env.ADMIN_USERNAME,
           isAdmin: true
         }
       });
     }
 
-    // 일반 사용자 로그인 로직은 그 다음에 실행
-    console.log('로그인 시도:', { email });
-    const [user] = await sequelize.query(
-      'SELECT * FROM users WHERE email = :email',
-      {
-        replacements: { email },
-        type: QueryTypes.SELECT
-      }
-    );
-
-    console.log('조회된 사용자:', user);
-    if (!user) {
-      return res.status(401).json({
-        success: false,
-        message: '이메일 또는 비밀번호가 올바르지 않습니다.'
-      });
-    }
-
-    const isValidPassword = await bcrypt.compare(password, (user as any).password);
-
-    if (!isValidPassword) {
-      return res.status(401).json({
-        success: false,
-        message: '이메일 또는 비밀번호가 올바르지 않습니다.'
-      });
-    }
-
-    const token = jwt.sign(
-      { 
-        id: (user as any).id, 
-        username: (user as any).username,
-        isAdmin: false
-      },
-      JWT_SECRET,
-      { expiresIn: '24h' }
-    );
-
-    res.json({
-      success: true,
-      token,
-      user: {
-        id: (user as any).id,
-        username: (user as any).username,
-        email: (user as any).email,
-        isAdmin: false
-      }
+    return res.status(401).json({
+      success: false,
+      message: '관리자 인증에 실패했습니다.'
     });
   } catch (error) {
-    console.error('로그인 오류:', error);
+    console.error('관리자 로그인 오류:', error);
     res.status(500).json({
       success: false,
       message: '로그인 처리 중 오류가 발생했습니다.'
@@ -194,61 +221,72 @@ router.post('/login', async (req: Request, res: Response) => {
   }
 });
 
-// 비밀번호 찾기
-router.post('/forgot-password', async (req: Request, res: Response) => {
+// 인증 상태 확인
+router.get('/verify', async (req: Request, res: Response) => {
   try {
-    const { email } = req.body;
-    console.log('받은 이메일:', email); // 디버깅용 로그 추가
-
-    // 사용자 확인 쿼리 수정 (users로 테이블명 수정)
-    const [results] = await sequelize.query(
-      'SELECT * FROM users WHERE email = :email',
-      {
-        replacements: { email },
-        type: QueryTypes.SELECT
-      }
-    );
-
-    console.log('조회 결과:', results); // 디버깅용 로그 추가
-
-    if (!results) {
-      return res.status(404).json({
+    const token = req.headers.authorization?.split(' ')[1];
+    
+    if (!token) {
+      return res.status(401).json({
         success: false,
-        message: '해당 이메일로 등록된 사용자를 찾을 수 없습니다.'
+        message: '인증 토큰이 없습니다.'
       });
     }
 
-    // 임시 비밀번호 생성
-    const tempPassword = generateTempPassword();
-    const hashedPassword = await bcrypt.hash(tempPassword, 10);
-
-    // DB에 임시 비밀번호 저장 (users로 테이블명 수정)
-    await sequelize.query(
-      'UPDATE users SET password = :password WHERE email = :email',
-      {
-        replacements: { password: hashedPassword, email },
-        type: QueryTypes.UPDATE
-      }
-    );
-
-    // 이메일로 임시 비밀번호 전송
-    await sendTempPasswordEmail(email, tempPassword);
-
+    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any;
     res.json({
       success: true,
-      message: '임시 비밀번호가 이메일로 발송되었습니다.'
+      user: {
+        id: decoded.id,
+        username: decoded.username,
+        isAdmin: decoded.isAdmin
+      }
     });
-
   } catch (error) {
-    console.error('비밀번호 재설정 오류:', error);
-    res.status(500).json({
+    res.status(401).json({
       success: false,
-      message: '비밀번호 재설정 중 오류가 발생했습니다.'
+      message: '유효하지 않은 토큰입니다.'
     });
   }
 });
 
-// 인증 상태 확인 엔드포인트 추가
-router.get('/verify', verifyToken, verifyAuth);
+passport.use(new GoogleStrategy({
+  clientID: process.env.GOOGLE_CLIENT_ID!,
+  clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+  callbackURL: `${process.env.BACKEND_URL}/auth/google/callback`,
+  passReqToCallback: true
+}, async (req: Request, accessToken: string, refreshToken: string, profile: Profile, done: VerifyCallback) => {
+  try {
+    const username = req.session?.state;
+    console.log('Session username:', username);
+
+    // 기존 사용자 확인
+    let user = await prisma.user.findFirst({
+      where: {
+        socialId: profile.id,
+        socialType: 'google'
+      }
+    });
+
+    if (user) {
+      // 기존 사용자가 있는데 username이 다르다면 에러 처리
+      if (user.username !== username) {
+        console.log('소셜 계정 중복 에러:', {
+          existingUsername: user.username,
+          attemptedUsername: username
+        });
+        return done(null, false, { 
+          message: '이미 다른 사용자가 사용 중인 소셜 계정입니다.' 
+        });
+      }
+      return done(null, user);
+    }
+
+    // 새 사용자 생성 로직...
+  } catch (error) {
+    console.error('Google OAuth 상세 에러:', error);
+    return done(error as Error);
+  }
+}));
 
 export default router;

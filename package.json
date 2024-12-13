@@ -5,12 +5,11 @@
     "main": "server/app.ts",
     "scripts": {
         "start": "node dist/server/app.js",
-        "dev": "nodemon server/app.ts",
-        "build": "tsc && cp .env dist/",
+        "dev": "nodemon --exec ts-node server/app.ts",
+        "build": "tsc",
         "test": "jest"
     },
     "dependencies": {
-        "@prisma/client": "^5.22.0",
         "@radix-ui/react-label": "^2.1.0",
         "@radix-ui/react-select": "^2.1.2",
         "@radix-ui/react-slot": "^1.1.0",
@@ -32,7 +31,6 @@
         "mysql2": "^3.11.4",
         "next": "^15.0.2",
         "nodemailer": "^6.9.16",
-        "prisma": "^5.22.0",
         "redis": "^4.7.0",
         "sequelize": "^6.37.5",
         "sequelize-cli": "^6.6.2",
