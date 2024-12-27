@@ -3,33 +3,22 @@ import prisma from '../lib/prisma';
 import { CustomRequest } from '../types/auth';
 import { Prisma } from '@prisma/client';
 
-interface ReviewCreateData {
-  title: string;
-  bookTitle: string;
-  content: string;
-  views: number;
-  username: string;
-  user: {
-    connect: {
-      username: string;
-    };
-  };
-}
-
 // 리뷰 생성
 export const createReview = async (req: CustomRequest, res: Response) => {
   try {
-    const { title, bookTitle, content } = req.body as {
-      title: string;
-      bookTitle: string;
-      content: string;
-    };
-    const username = req.user?.username;
-
-    if (!username) {
+    const { content, title, bookTitle, publisher, bookAuthor } = req.body;
+    
+    if (!req.user?.username) {
       return res.status(401).json({
         success: false,
         message: '인증이 필요합니다.'
+      });
+    }
+
+    if (!title || !bookTitle || !content) {
+      return res.status(400).json({
+        success: false,
+        message: '제목, 책 제목, 내용은 필수 입력사항입니다.'
       });
     }
 
@@ -38,28 +27,31 @@ export const createReview = async (req: CustomRequest, res: Response) => {
         title,
         bookTitle,
         content,
+        username: req.user.username,
         views: 0,
-        username,
+        ...(publisher && { publisher }),
+        ...(bookAuthor && { bookAuthor }),
         user: {
           connect: {
-            username
+            username: req.user.username
           }
         }
-      } as any
+      }
     });
 
-    res.json({
+    return res.json({
       success: true,
       review
     });
   } catch (error) {
     console.error('리뷰 생성 오류:', error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: '리뷰 생성 중 오류가 발생했습니다.'
     });
   }
 };
+
 // 리뷰 목록 조회
 export const getReviews = async (req: CustomRequest, res: Response) => {
   try {
@@ -129,37 +121,53 @@ export const getReview = async (req: CustomRequest, res: Response) => {
 // 리뷰 수정
 export const updateReview = async (req: CustomRequest, res: Response) => {
   try {
-    const id = parseInt(req.params.id);
-    const { title, bookTitle, content } = req.body as {
-      title: string;
-      bookTitle: string;
-      content: string;
-    };
-    const userId = req.user?.id;
+    const reviewId = parseInt(req.params.id);
+    const { title, bookTitle, content, publisher, bookAuthor } = req.body;
 
-    if (!userId) {
+    if (!req.user?.username) {
       return res.status(401).json({
         success: false,
         message: '인증이 필요합니다.'
       });
     }
 
-    const review = await prisma.review.update({
-      where: { id },
+    const existingReview = await prisma.review.findUnique({
+      where: { id: reviewId },
+      include: { user: true }
+    });
+
+    if (!existingReview) {
+      return res.status(404).json({
+        success: false,
+        message: '리뷰를 찾을 수 없습니다.'
+      });
+    }
+
+    if (existingReview.user.username !== req.user.username) {
+      return res.status(403).json({
+        success: false,
+        message: '리뷰를 수정할 권한이 없습니다.'
+      });
+    }
+
+    const updatedReview = await prisma.review.update({
+      where: { id: reviewId },
       data: {
         title,
         bookTitle,
-        content
-      } as any
+        content,
+        ...(publisher && { publisher }),
+        ...(bookAuthor && { bookAuthor })
+      }
     });
 
-    res.json({
+    return res.json({
       success: true,
-      review
+      review: updatedReview
     });
   } catch (error) {
     console.error('리뷰 수정 오류:', error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: '리뷰 수정 중 오류가 발생했습니다.'
     });
@@ -175,9 +183,7 @@ export const deleteReview = async (req: CustomRequest, res: Response) => {
     // 리뷰 존재 여부 및 작성자 확인
     const existingReview = await prisma.review.findUnique({
       where: { id: reviewId },
-      include: {
-        user: true
-      }
+      include: { user: true }
     });
 
     if (!existingReview) {

@@ -1,6 +1,7 @@
 import type { Response } from 'express';
 import { CustomRequest } from '../types/auth';
 import prisma from '../lib/prisma';
+import { User } from '../models';
 
 // 댓글 생성
 export const createComment = async (req: CustomRequest, res: Response) => {
@@ -193,8 +194,9 @@ export const deleteComment = async (req: CustomRequest, res: Response) => {
   try {
     const { id } = req.params;
     const userId = req.user?.id;
+    const username = req.user?.username;
 
-    if (!userId) {
+    if (!userId || !username) {
       return res.status(401).json({
         success: false,
         message: '인증이 필요합니다.'
@@ -212,7 +214,7 @@ export const deleteComment = async (req: CustomRequest, res: Response) => {
       });
     }
 
-    if (comment.userId !== userId && !req.user?.isAdmin) {
+    if (comment.userId !== userId && !User.isAdminUsername(username)) {
       return res.status(403).json({
         success: false,
         message: '댓글을 삭제할 권한이 없습니다.'

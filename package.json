@@ -4,8 +4,8 @@
     "description": "책익는 마을 - 독서 리뷰 공유 플랫폼",
     "main": "server/app.ts",
     "scripts": {
-        "start": "node dist/server/app.js",
-        "dev": "nodemon --exec ts-node server/app.ts",
+        "start": "node dist/server.ts",
+        "dev": "ts-node server.ts",
         "build": "tsc",
         "test": "jest"
     },

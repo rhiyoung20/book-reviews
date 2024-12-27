@@ -2,6 +2,7 @@ import type { Response, NextFunction } from 'express-serve-static-core';
 import prisma from '../lib/prisma';
 import type { CustomRequest } from '../types/auth';
 import type { Request } from 'express';
+import { User } from '../models';
 
 // 사용자의 리뷰 목록 조회
 export const getUserReviews = async (req: CustomRequest, res: Response, next: NextFunction) => {
@@ -13,7 +14,7 @@ export const getUserReviews = async (req: CustomRequest, res: Response, next: Ne
     const userId = req.params.userId || req.user.id;
 
     // 다른 사용자의 정보를 요청할 경우 관리자 권한 체크
-    if (userId !== req.user.id && req.user.isAdmin !== true) {
+    if (userId !== req.user.id && !User.isAdminUsername(req.user.username)) {
       return res.status(403).json({ message: '권한이 없습니다.' });
     }
     
@@ -40,7 +41,7 @@ export const getUserComments = async (req: CustomRequest, res: Response) => {
     const userId = req.params.userId || req.user.id;
 
     // 다른 사용자의 정보를 요청할 경우 관리자 권한 체크
-    if (userId !== req.user.id && req.user.isAdmin !== true) {
+    if (userId !== req.user.id && !User.isAdminUsername(req.user.username)) {
       return res.status(403).json({ message: '권한이 없습니다.' });
     }
     

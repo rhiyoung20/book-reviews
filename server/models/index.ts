@@ -1,11 +1,19 @@
 import User from './User';
 import Review from './Review';
 import Comment from './Comment';
+import sequelize from '../config/database';
 
 // 관계 설정
-Review.hasMany(Comment, {
-  foreignKey: 'reviewId',
-  as: 'comments'
+Review.belongsTo(User, {
+  foreignKey: 'username',
+  targetKey: 'username',
+  as: 'user'
+});
+
+Comment.belongsTo(User, {
+  foreignKey: 'username',
+  targetKey: 'username',
+  as: 'user'
 });
 
 Comment.belongsTo(Review, {
@@ -13,8 +21,9 @@ Comment.belongsTo(Review, {
   as: 'review'
 });
 
-export {
-  User,
-  Review,
-  Comment
-};
+Review.hasMany(Comment, {
+  foreignKey: 'reviewId',
+  as: 'comments'
+});
+
+export { User, Review, Comment, sequelize };

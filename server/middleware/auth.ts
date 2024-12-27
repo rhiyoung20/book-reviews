@@ -1,9 +1,9 @@
-import { Response, NextFunction } from 'express';
+import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { CustomRequest, AuthUser } from '../types/auth';
 
 const verifyToken = (
-  req: CustomRequest, 
+  req: Request, 
   res: Response, 
   next: NextFunction
 ): void => {
@@ -16,7 +16,7 @@ const verifyToken = (
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET!) as AuthUser;
-    req.user = decoded;
+    (req as CustomRequest).user = decoded;
     next();
   } catch (error) {
     res.status(401).json({ message: '유효하지 않은 토큰입니다.' });

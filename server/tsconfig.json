@@ -1,19 +1,28 @@
 {
     "compilerOptions": {
-      "esModuleInterop": true,
-      "skipLibCheck": true,
       "target": "es6",
       "module": "commonjs",
-      "moduleResolution": "node",
       "outDir": "./dist",
-      "rootDir": "./",
+      "rootDir": ".",
       "strict": true,
-      "baseUrl": "./",
-      "paths": {
-        "*": ["node_modules/*"]
-      },
-      "typeRoots": ["./node_modules/@types", "./server/types"]
+      "esModuleInterop": true,
+      "skipLibCheck": true,
+      "forceConsistentCasingInFileNames": true,
+      "typeRoots": [
+        "./types",
+        "./node_modules/@types"
+      ],
+      "types": [
+        "node",
+        "express",
+        "express-session"
+      ]
     },
-    "include": ["./**/*.ts"],
-    "exclude": ["node_modules"]
-  }
+    "include": [
+      "./**/*"
+    ],
+    "exclude": [
+      "node_modules",
+      "dist"
+    ]
+}

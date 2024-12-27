@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "mysql"
   url      = env("DATABASE_URL")
 }
 
@@ -24,12 +24,11 @@ model User {
 model Review {
   id        Int       @id @default(autoincrement())
   content   String
-  userId    Int
+  username  String
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
-  rating    Int
   comments  Comment[]
-  user      User      @relation(fields: [userId], references: [id])
+  user      User      @relation(fields: [username], references: [username])
 
   @@map("reviews")
 }
@@ -37,12 +36,12 @@ model Review {
 model Comment {
   id        Int      @id @default(autoincrement())
   content   String
-  userId    Int
+  username  String
   reviewId  Int
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   review    Review   @relation(fields: [reviewId], references: [id])
-  user      User     @relation(fields: [userId], references: [id])
+  user      User     @relation(fields: [username], references: [username])
 
   @@map("comments")
 }

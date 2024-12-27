@@ -4,8 +4,8 @@ export interface ReviewAttributes {
     id: number;
     title: string;
     bookTitle: string;
-    publisher?: string;
-    bookAuthor?: string;
+    publisher: string | null;
+    bookAuthor: string | null;
     content: string;
     username: string;
     views: number;

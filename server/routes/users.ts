@@ -32,8 +32,14 @@ router.get('/comments',
 router.post('/test-signup', async (req, res) => {
   try {
     const { username } = req.body;
-    
-    // 새 사용자 생성
+
+    if (!username) {
+      return res.status(400).json({
+        success: false,
+        message: '사용자명이 필요합니다.'
+      });
+    }
+
     const user = await User.create({
       username,
       isAdmin: false

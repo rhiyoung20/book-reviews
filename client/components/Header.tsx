@@ -1,95 +1,86 @@
-import React, { useContext, useState } from 'react';
+import { useUser } from '@/context/UserContext';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { Button } from './ui/Button';
-import { UserContext } from '@/context/UserContext';
-import AuthModal from './auth/AuthModal';
+import { useState } from 'react';
+import LoginForm from './auth/LoginForm';
+import SignupForm from './auth/SignupForm';
 
-interface HeaderProps {
-  hideAuthButtons?: boolean;
-}
-
-const Header = ({ hideAuthButtons = false }: HeaderProps) => {
+export default function Header() {
+  const { username, setUsername } = useUser();
   const router = useRouter();
-  const { username, setUsername } = useContext(UserContext);
-  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
-  const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  const [showSignupModal, setShowSignupModal] = useState(false);
 
-  const handleLogout = async () => {
+  const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('username');
-    setUsername('');
+    setUsername(null);
     router.push('/');
   };
 
-  const openLoginModal = () => {
-    setAuthMode('login');
-    setIsAuthModalOpen(true);
+  const switchToLogin = () => {
+    setShowSignupModal(false);
+    setShowLoginModal(true);
   };
 
-  const openSignupModal = () => {
-    setAuthMode('signup');
-    setIsAuthModalOpen(true);
-  };
-
-  const switchAuthMode = () => {
-    setAuthMode(authMode === 'login' ? 'signup' : 'login');
+  const switchToSignup = () => {
+    setShowLoginModal(false);
+    setShowSignupModal(true);
   };
 
   return (
     <>
-      <header className="mt-2">
-        <div className="container mx-auto px-4 py-4">
-          <nav className="flex justify-between items-center">
-            <Link href="/" className="text-2xl font-bold text-green-600">
-              책익는 마을
-            </Link>
-            
-            {!hideAuthButtons && (
-              <div className="flex items-center space-x-4">
-                {username ? (
-                  <>
-                    <span className="text-gray-600">{username}</span>
-                    <Link href="/mypage">
-                      <Button variant="outline">마이 페이지</Button>
-                    </Link>
-                    <Button 
-                      variant="ghost" 
-                      onClick={handleLogout}
-                    >
-                      로그아웃
-                    </Button>
-                  </>
-                ) : (
-                  <>
-                    <Button 
-                      variant="outline"
-                      onClick={openLoginModal}
-                    >
-                      로그인
-                    </Button>
-                    <Button 
-                      variant="outline"
-                      onClick={openSignupModal}
-                    >
-                      회원가입
-                    </Button>
-                  </>
-                )}
-              </div>
+      <header className="bg-white shadow mt-8">
+        <nav className="container mx-auto px-4 py-6 flex justify-between items-center">
+          <Link href="/">
+            <span className="text-3xl font-bold text-green-700">책익는 마을</span>
+          </Link>
+          <div className="flex items-center gap-4">
+            {username ? (
+              <>
+                <span className="text-sm text-gray-600">{username}님</span>
+                <Link href="/mypage">
+                  <span className="text-sm text-blue-600">마이페이지</span>
+                </Link>
+                <button
+                  onClick={handleLogout}
+                  className="text-sm text-red-600 hover:text-red-700"
+                >
+                  로그아웃
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  onClick={() => setShowLoginModal(true)}
+                  className="text-sm text-blue-600 hover:text-blue-700"
+                >
+                  로그인
+                </button>
+                <button
+                  onClick={() => setShowSignupModal(true)}
+                  className="text-sm text-green-600 hover:text-green-700"
+                >
+                  회원가입
+                </button>
+              </>
             )}
-          </nav>
-        </div>
+          </div>
+        </nav>
       </header>
 
-      <AuthModal 
-        isOpen={isAuthModalOpen}
-        onClose={() => setIsAuthModalOpen(false)}
-        mode={authMode}
-        switchMode={switchAuthMode}
-      />
+      {showLoginModal && (
+        <LoginForm
+          onClose={() => setShowLoginModal(false)}
+          switchToSignup={switchToSignup}
+        />
+      )}
+      {showSignupModal && (
+        <SignupForm
+          onClose={() => setShowSignupModal(false)}
+          switchToLogin={switchToLogin}
+        />
+      )}
     </>
   );
-};
-
-export default Header;
+}
