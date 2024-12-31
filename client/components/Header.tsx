@@ -1,7 +1,7 @@
 import { useUser } from '@/context/UserContext';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import LoginForm from './auth/LoginForm';
 import SignupForm from './auth/SignupForm';
 
@@ -10,6 +10,18 @@ export default function Header() {
   const router = useRouter();
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showSignupModal, setShowSignupModal] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    // 초기 로드 시 로컬 스토리지 확인
+    const storedUsername = localStorage.getItem('username');
+    const storedToken = localStorage.getItem('token');
+    
+    if (storedUsername && storedToken && !username) {
+      setUsername(storedUsername);
+    }
+    setIsLoading(false);
+  }, []);
 
   const handleLogout = () => {
     localStorage.removeItem('token');
@@ -27,6 +39,10 @@ export default function Header() {
     setShowLoginModal(false);
     setShowSignupModal(true);
   };
+
+  if (isLoading) {
+    return null; // 또는 로딩 스피너
+  }
 
   return (
     <>

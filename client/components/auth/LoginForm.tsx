@@ -1,4 +1,4 @@
-import { useState, useContext } from 'react'
+import { useState, useContext, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import SocialLogin from './SocialLogin'
 import { useUser } from '@/context/UserContext'
@@ -16,20 +16,51 @@ export default function LoginForm({ onClose, switchToSignup }: LoginFormProps) {
   const [error, setError] = useState('')
 
   const handleGoogleLogin = () => {
-    window.location.href = `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/auth/google`;
+    try {
+      console.log('구글 로그인 시도');
+      setIsLoading(true);
+      
+      // 로컬 스토리지 초기화
+      localStorage.removeItem('token');
+      localStorage.removeItem('username');
+
+      // 백엔드 URL 확인
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:4000';
+      const googleAuthUrl = `${backendUrl}/api/auth/google`;
+      
+      console.log('구글 인증 URL:', googleAuthUrl);
+      window.location.href = googleAuthUrl;
+    } catch (error) {
+      console.error('Google 로그인 오류:', error);
+      setError('구글 로그인 처리 중 오류가 발생했습니다.');
+    }
   };
 
   const handleKakaoLogin = async () => {
     try {
-      setIsLoading(true)
-      window.location.href = `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/auth/kakao`
+      console.log('카카오 로그인 시도');
+      setIsLoading(true);
+      
+      // 로컬 스토리지 초기화
+      localStorage.removeItem('token');
+      localStorage.removeItem('username');
+
+      // 백엔드 URL 확인
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:4000';
+      const kakaoAuthUrl = `${backendUrl}/api/auth/kakao`;
+      
+      console.log('카카오 인증 URL:', kakaoAuthUrl);
+      window.location.href = kakaoAuthUrl;
     } catch (error) {
-      console.error('Kakao 로그인 오류:', error)
-      setError('로그인 처리 중 오류가 발생했습니다.')
-    } finally {
-      setIsLoading(false)
+      console.error('Kakao 로그인 오류:', error);
+      setError('카카오 로그인 처리 중 오류가 발생했습니다.');
     }
-  }
+  };
+
+  // 환경변수 확인을 위한 useEffect 추가
+  useEffect(() => {
+    console.log('NEXT_PUBLIC_BACKEND_URL:', process.env.NEXT_PUBLIC_BACKEND_URL);
+  }, []);
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">

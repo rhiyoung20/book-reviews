@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useUser } from "@/context/UserContext";
 import { useRouter } from "next/router";
 import { useState } from "react";
@@ -9,14 +10,30 @@ import { Textarea } from "@/components/ui/Textarea";
 import { axiosInstance } from "@/lib/axios";
 
 export default function WriteReview() {
-  const { username } = useUser();
+  const router = useRouter();
+  const { username } = useUser() || {};
   const [title, setTitle] = useState('');
   const [bookTitle, setBookTitle] = useState('');
   const [publisher, setPublisher] = useState('');
   const [bookAuthor, setBookAuthor] = useState('');
   const [content, setContent] = useState('');
-  const router = useRouter();
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      router.push('/?showLoginModal=true');
+      return;
+    }
+  }, [router]);
+
+  if (!username) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div>로딩 중...</div>
+      </div>
+    );
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,7 +56,8 @@ export default function WriteReview() {
         username
       }, {
         headers: { 
-          Authorization: `Bearer ${token}`
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
         }
       });
 
@@ -62,8 +80,8 @@ export default function WriteReview() {
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-3xl mx-auto bg-white rounded-lg shadow p-8">
           <form onSubmit={handleSubmit} className="space-y-6">
-            <div>
-              <Label htmlFor="title" className="text-3xl font-extrabold">제목</Label>
+            <div className="flex items-center">
+              <span className="text-sm font-medium leading-none w-20">제목</span>
               <Input
                 id="title"
                 type="text"
@@ -71,11 +89,11 @@ export default function WriteReview() {
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 required
-                className="ml-10 w-[80%]"
+                className="flex-1"
               />
             </div>
-            <div>
-              <Label htmlFor="bookTitle" className="text-3xl font-extrabold">도서 제목</Label>
+            <div className="flex items-center">
+              <span className="text-sm font-medium leading-none w-20">도서 제목</span>
               <Input
                 id="bookTitle"
                 type="text"
@@ -83,40 +101,40 @@ export default function WriteReview() {
                 value={bookTitle}
                 onChange={(e) => setBookTitle(e.target.value)}
                 required
-                className="ml-10 w-[80%]"
+                className="flex-1"
               />
             </div>
-            <div>
-              <Label htmlFor="publisher" className="text-3xl font-extrabold">출판사</Label>
+            <div className="flex items-center">
+              <span className="text-sm font-medium leading-none w-20">출판사</span>
               <Input
                 id="publisher"
                 type="text"
                 placeholder="출판사를 입력하세요(선택 사항)"
                 value={publisher}
                 onChange={(e) => setPublisher(e.target.value)}
-                className="ml-10 w-[80%]"
+                className="flex-1"
               />
             </div>
-            <div>
-              <Label htmlFor="bookAuthor" className="text-3xl font-extrabold">저자</Label>
+            <div className="flex items-center">
+              <span className="text-sm font-medium leading-none w-20">저자</span>
               <Input
                 id="bookAuthor"
                 type="text"
                 placeholder="저자를 입력하세요(선택 사항)"
                 value={bookAuthor}
                 onChange={(e) => setBookAuthor(e.target.value)}
-                className="ml-10 w-[80%]"
+                className="flex-1"
               />
             </div>
-            <div>
-              <Label htmlFor="content" className="text-3xl font-extrabold">내용</Label>
+            <div className="space-y-2">
+              <span className="text-sm font-medium leading-none block">내용</span>
               <Textarea
                 id="content"
                 value={content}
                 onChange={(e) => setContent(e.target.value)}
                 required
                 rows={8}
-                className="w-full text-xl mt-2"
+                className="w-full text-xl"
               />
             </div>
             <div className="flex justify-end space-x-6 mt-8">

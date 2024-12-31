@@ -3,11 +3,12 @@ import { RiKakaoTalkFill } from 'react-icons/ri'
 
 interface SocialLoginProps {
   onGoogleLogin: () => void
-  onKakaoLogin: () => void
+  onKakaoLogin: (username: string) => Promise<void>
   isLoading: boolean
+  username: string
 }
 
-export default function SocialLogin({ onGoogleLogin, onKakaoLogin, isLoading }: SocialLoginProps) {
+export default function SocialLogin({ onGoogleLogin, onKakaoLogin, isLoading, username }: SocialLoginProps) {
   return (
     <div className="space-y-2">
       <button
@@ -22,7 +23,7 @@ export default function SocialLogin({ onGoogleLogin, onKakaoLogin, isLoading }: 
 
       <button
         type="button"
-        onClick={onKakaoLogin}
+        onClick={(e) => onKakaoLogin(username)}
         disabled={isLoading}
         className="w-full flex items-center justify-center gap-2 px-4 py-2 border border-yellow-400 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-yellow-300 hover:bg-yellow-400 disabled:opacity-50"
       >

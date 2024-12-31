@@ -41,23 +41,34 @@ function HomeComponent() {
 
   useEffect(() => {
     const handleSocialAuthResponse = async () => {
-      // 소셜 로그인 성공 시
-      if (token && queryUsername && status === 'success') {
+      const urlParams = new URLSearchParams(window.location.search);
+      const token = urlParams.get('token');
+      const username = urlParams.get('username');
+      const status = urlParams.get('status');
+
+      console.log('URL 파라미터:', { token, username, status });
+
+      if (token && username && status === 'success') {
         try {
-          // Context에 로그인 상태 반영
-          localStorage.setItem('token', token as string);
-          localStorage.setItem('username', decodeURIComponent(queryUsername as string));
-          setUsername(decodeURIComponent(queryUsername as string));
+          const decodedUsername = decodeURIComponent(username);
+          
+          // 로컬 스토리지에 저장
+          localStorage.setItem('token', token);
+          localStorage.setItem('username', decodedUsername);
+          
+          // Context 업데이트
+          setUsername(decodedUsername);
           
           // URL 파라미터 제거
-          await router.replace('/', undefined, { shallow: true });
+          router.replace('/', undefined, { shallow: true });
         } catch (err) {
           console.error('소셜 로그인 처리 오류:', err);
         }
       }
     };
+
     handleSocialAuthResponse();
-  }, [token, queryUsername, status, router, setUsername]);
+  }, []);
 
   const [reviews, setReviews] = useState<Review[]>([]);
   const [currentPage, setCurrentPage] = useState(1);

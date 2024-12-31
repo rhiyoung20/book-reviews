@@ -5,17 +5,17 @@ import prisma from '../lib/prisma';
 import { User } from "../models";
 import { RequestWithUser } from '../types/auth';
 
-// CustomUser 인터페이스 수정
-interface CustomUser {
+// User 타입 정의 수정
+interface CustomUser extends User {
   id: number;
-  username?: string;
+  username: string;  // undefined 허용하지 않음
   googleId?: string;
   kakaoId?: string;
 }
 
-// Request에 user 속성 추가
+// Request 타입 수정
 interface CustomRequest extends Request {
-  user?: CustomUser;
+  user?: CustomUser;  // User 타입으로 변경
 }
 
 // 소셜 로그인 성공 시 처리
@@ -35,7 +35,7 @@ export const socialLoginSuccess = async (req: CustomRequest, res: Response) => {
       { expiresIn: '1d' }
     );
 
-    res.redirect(`${config.frontendUrl}/?token=${token}&username=${user.username}`);
+    res.redirect(`${config.frontendUrl}/?token=${token}&username=${user.username}&status=success`);
   } catch (error) {
     console.error('소셜 로그인 오류:', error);
     res.redirect(`${config.frontendUrl}/login?error=auth_failed`);

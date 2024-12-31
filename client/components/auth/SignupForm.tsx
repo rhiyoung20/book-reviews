@@ -59,12 +59,49 @@ export default function SignupForm({ onClose, switchToLogin }: SignupFormProps) 
     }
   }
 
-  const handleGoogleSignup = () => {
-    window.location.href = `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/auth/google?username=${encodeURIComponent(formData.username)}`;
+  const handleGoogleSignup = async () => {
+    console.log('Google 회원가입 시도 시작');
+    
+    if (!isUsernameVerified) {
+      alert('먼저 사용자명 중복확인을 해주세요.');
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      console.log('API 요청 시작:', {
+        url: '/api/auth/prepare-signup',
+        username: formData.username
+      });
+      
+      const prepareResponse = await axiosInstance.post('/api/auth/prepare-signup', {
+        username: formData.username
+      });
+      console.log('prepare-signup 응답:', prepareResponse);
+
+      const googleAuthUrl = `${process.env.NEXT_PUBLIC_API_URL}/api/auth/google`;
+      console.log('리다이렉트 URL:', googleAuthUrl);
+      
+      window.location.href = googleAuthUrl;
+    } catch (error: any) {
+      console.error('Google 회원가입 상세 오류:', error);
+      alert('회원가입 처리 중 오류가 발생했습니다.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleKakaoSignup = () => {
-    window.location.href = `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/auth/kakao?username=${encodeURIComponent(formData.username)}`;
+  const handleKakaoSignup = async (username: string) => {
+    try {
+      // prepare-signup 엔드포인트 호출
+      await axiosInstance.post('/api/auth/prepare-signup', { username });
+      
+      // 카카오 로그인 페이지로 리다이렉트 (전체 URL 사용)
+      window.location.href = `${process.env.NEXT_PUBLIC_API_URL}/api/auth/kakao?username=${encodeURIComponent(username)}`;
+    } catch (error) {
+      console.error('Kakao 회원가입 오류:', error);
+      alert('카카오 회원가입 처리 중 오류가 발생했습니다.');
+    }
   };
 
   return (
@@ -114,21 +151,10 @@ export default function SignupForm({ onClose, switchToLogin }: SignupFormProps) 
           </div>
 
           <SocialLogin 
-            onGoogleLogin={() => {
-              if (!isUsernameVerified) {
-                alert('먼저 사용자명 중복확인을 해주세요.');
-                return;
-              }
-              handleGoogleSignup();
-            }}
-            onKakaoLogin={() => {
-              if (!isUsernameVerified) {
-                alert('먼저 사용자명 중복확인을 해주세요.');
-                return;
-              }
-              handleKakaoSignup();
-            }}
+            onGoogleLogin={handleGoogleSignup}
+            onKakaoLogin={handleKakaoSignup}
             isLoading={isLoading}
+            username={formData.username}
           />
 
           <div className="text-center">

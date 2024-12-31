@@ -3,25 +3,12 @@ import passport from 'passport';
 import jwt from 'jsonwebtoken';
 import config from '../config/config';
 import { User } from '../models';
-
-// AuthUser 타입 정의
-interface AuthUser {
-  id: number;
-  username: string;
-  isAdmin?: boolean;
-  googleId?: string;
-  kakaoId?: string;
-}
-
-// Request 타입 확장
-interface RequestWithUser extends Request {
-  user?: AuthUser;
-}
+import { RequestWithUser } from '../types/auth';
 
 const router = Router();
 
 // JWT 토큰 생성 함수
-const generateToken = (user: AuthUser) => {
+const generateToken = (user: Express.User) => {
   if (!config.jwtSecret) {
     throw new Error('JWT_SECRET is not configured');
   }
@@ -51,26 +38,32 @@ router.get('/google',
 // Google 콜백
 router.get(
   '/google/callback',
-  passport.authenticate('google', {
-    session: false,
-    failureRedirect: `${process.env.FRONTEND_URL}/?error=auth_failed`
-  }),
-  (req: Request, res: Response) => {
+  passport.authenticate('google', { session: false }),
+  async (req: Request, res: Response) => {
     try {
-      const user = req.user as AuthUser;
-      if (!user) {
-        throw new Error('사용자 정보가 없습니다.');
+      const user = req.user as User;
+      if (!user || !user.username) {
+        throw new Error('사용자를 찾을 수 없습니다.');
       }
 
-      const token = generateToken(user);
-      const username = encodeURIComponent(user.username);
+      // username으로 사용자 재조회
+      const verifiedUser = await User.findOne({
+        where: { username: user.username }
+      });
+
+      if (!verifiedUser) {
+        throw new Error('사용자를 찾을 수 없습니다.');
+      }
+
+      const token = generateToken(verifiedUser);
+      console.log('생성된 토큰:', token);
 
       res.redirect(
-        `${process.env.FRONTEND_URL}/?token=${token}&username=${username}&status=success`
+        `${process.env.FRONTEND_URL}/?token=${token}&username=${encodeURIComponent(verifiedUser.username)}&status=success`
       );
     } catch (error) {
       console.error('Google 콜백 오류:', error);
-      res.redirect(`${process.env.FRONTEND_URL}/?error=로그인_처리_중_오류가_발생했습니다`);
+      res.redirect(`${process.env.FRONTEND_URL}/login?error=auth_failed`);
     }
   }
 );
@@ -79,6 +72,11 @@ router.get(
 router.get('/kakao', 
   (req: Request, res: Response, next: NextFunction) => {
     console.log('Kakao 로그인 요청 받음');
+    const { username } = req.query;
+    if (username && req.session) {
+      req.session.pendingUsername = username as string;
+      console.log('세션에 username 저장됨:', username);
+    }
     next();
   },
   passport.authenticate('kakao', {
@@ -86,29 +84,40 @@ router.get('/kakao',
   })
 );
 
-// Kakao 콜백
+// Kakao 콜백 (하나로 통합)
 router.get(
   '/kakao/callback',
-  passport.authenticate('kakao', {
-    session: false,
-    failureRedirect: `${process.env.FRONTEND_URL}/?error=auth_failed`
-  }),
-  (req: Request, res: Response) => {
+  passport.authenticate('kakao', { session: false }),
+  async (req: Request, res: Response) => {
     try {
-      const user = req.user as AuthUser;
+      const user = req.user as User;
       if (!user) {
-        throw new Error('사용자 정보가 없습니다.');
+        console.error('카카오 콜백: 사용자 정보 없음');
+        throw new Error('사용자를 찾을 수 없습니다.');
       }
 
-      const token = generateToken(user);
-      const username = encodeURIComponent(user.username);
+      // username으로 사용자 재조회 (Google 로그인과 동일한 방식)
+      const verifiedUser = await User.findOne({
+        where: { username: user.username }
+      });
 
+      if (!verifiedUser) {
+        console.error('카카오 콜백: 사용자 검증 실패');
+        throw new Error('사용자를 찾을 수 없습니다.');
+      }
+
+      const token = generateToken(verifiedUser);
+      console.log('카카오 로그인 성공:', { 
+        username: verifiedUser.username,
+        hasToken: !!token 
+      });
+      
       res.redirect(
-        `${process.env.FRONTEND_URL}/?token=${token}&username=${username}&status=success`
+        `${process.env.FRONTEND_URL}/?token=${token}&username=${encodeURIComponent(verifiedUser.username)}&status=success`
       );
     } catch (error) {
-      console.error('Kakao 콜백 오류:', error);
-      res.redirect(`${process.env.FRONTEND_URL}/?error=로그인_처리_중_오류가_발생했습니다`);
+      console.error('Kakao 콜백 상세 오류:', error);
+      res.redirect(`${process.env.FRONTEND_URL}/login?error=auth_failed&message=${encodeURIComponent('카카오 로그인 처리 중 오류가 발생했습니다.')}`);
     }
   }
 );
@@ -171,13 +180,38 @@ router.post('/signup', async (req: Request, res: Response) => {
   }
 });
 
-// Kakao 콜백 테스트
-router.get('/oauth/kakao/callback', (req: Request, res: Response) => {
-  const { state } = req.query;
-  if (req.session) {
-    req.session.pendingUsername = state as string;
+// prepare-signup 엔드포인트 추가
+router.post('/prepare-signup', async (req: Request, res: Response) => {
+  try {
+    const { username } = req.body;
+    console.log('prepare-signup 요청:', { username });
+
+    if (!username) {
+      return res.status(400).json({
+        success: false,
+        message: '사용자명이 필요합니다.'
+      });
+    }
+
+    // 세션에 username 저장
+    if (req.session) {
+      req.session.pendingUsername = username;
+      console.log('세션에 저장된 username:', req.session.pendingUsername);
+    } else {
+      throw new Error('세션이 없습니다.');
+    }
+
+    res.json({
+      success: true,
+      message: '사용자명이 성공적으로 저장되었습니다.'
+    });
+  } catch (error) {
+    console.error('prepare-signup 오류:', error);
+    res.status(500).json({
+      success: false,
+      message: '사용자명 저장 중 오류가 발생했습니다.'
+    });
   }
-  res.json({ success: true });
 });
 
 export default router;

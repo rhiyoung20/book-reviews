@@ -1,4 +1,4 @@
-import { createContext, useContext, useState } from 'react'
+import { createContext, useContext, useState, useEffect } from 'react'
 
 interface UserContextType {
   username: string | null
@@ -8,7 +8,20 @@ interface UserContextType {
 const UserContext = createContext<UserContextType | undefined>(undefined)
 
 export function UserProvider({ children }: { children: React.ReactNode }) {
-  const [username, setUsername] = useState<string | null>(null)
+  const [username, setUsername] = useState<string | null>(() => {
+    // 클라이언트 사이드에서만 실행되도록
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('username')
+    }
+    return null
+  })
+
+  useEffect(() => {
+    // username이 변경될 때마다 로컬 스토리지 업데이트
+    if (username) {
+      localStorage.setItem('username', username)
+    }
+  }, [username])
 
   return (
     <UserContext.Provider value={{ username, setUsername }}>
