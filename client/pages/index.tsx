@@ -294,7 +294,7 @@ function HomeComponent() {
                       {review.id}
                     </td>
                     <td className="px-3 py-1.5 whitespace-nowrap">
-                      <Link href={`/${review.id}`}>
+                      <Link href={`/reviews/${review.id}`}>
                         <span className="text-blue-600 hover:text-blue-900 cursor-pointer text-xs">
                           {review.title}
                         </span>

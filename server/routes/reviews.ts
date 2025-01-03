@@ -14,7 +14,7 @@ interface ReviewAttributes {
   content: string;
   username: string;
   views: number;
-  createdAt?: Date;
+  createdAt: Date;
   updatedAt?: Date;
 }
 
@@ -201,6 +201,50 @@ router.post('/', verifyToken, asyncHandler(async (req: Request, res: Response) =
     success: true,
     review
   });      
+}));
+
+// 단일 리뷰 조회 라우트
+router.get('/:id', asyncHandler(async (req: Request, res: Response) => {
+  const reviewId = parseInt(req.params.id);
+
+  const review = await Review.findOne({
+    where: { id: reviewId },
+    attributes: [
+      'id', 
+      'title', 
+      'content', 
+      'username',
+      'bookTitle',
+      'bookAuthor',
+      'publisher',
+      'views',
+      'createdAt'
+    ]
+  });
+
+  if (!review) {
+    return res.status(404).json({ success: false, message: '리뷰를 찾을 수 없습니다.' });
+  }
+
+  // 조회수 증가
+  await review.increment('views');
+
+  const reviewData = review.toJSON() as ReviewAttributes;
+  
+  // MySQL datetime 문자열을 ISO 형식으로 변환
+  const createdAtStr = reviewData.createdAt.toString();
+  const formattedDate = createdAtStr.replace(' ', 'T') + '.000Z';
+  
+  const responseData = {
+    success: true,
+    review: {
+      ...reviewData,
+      createdAt: formattedDate,  // ISO 형식으로 변환된 날짜
+      views: reviewData.views + 1
+    }
+  };
+
+  return res.json(responseData);
 }));
 
 export default router;
