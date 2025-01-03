@@ -163,36 +163,6 @@ passport.use('kakao',
   )
 );
 
-// Google 로그인 전략
-passport.use('google',
-  new GoogleStrategy(
-    {
-      clientID: config.google.clientId,
-      clientSecret: config.google.clientSecret,
-      callbackURL: config.google.callbackUrl,
-      passReqToCallback: true
-    },
-    async (req: Request, accessToken: string, refreshToken: string, profile: any, done: any) => {
-      try {
-        const googleId = profile.id;
-
-        // googleId로 사용자 찾기
-        const user = await User.findOne({
-          where: { googleId }
-        });
-
-        if (!user) {
-          return done(null, false, { message: '등록되지 않은 사용자입니다.' });
-        }
-
-        return done(null, user);
-      } catch (error) {
-        return done(error);
-      }
-    }
-  )
-);
-
 // 세션 설정
 passport.serializeUser((user: any, done) => {
   done(null, user.id);

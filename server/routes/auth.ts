@@ -21,9 +21,27 @@ const generateToken = (user: Express.User) => {
 
 // Google OAuth
 router.get('/google', 
+  (req: Request, res: Response, next: NextFunction) => {
+    console.log('Google 로그인 요청 받음');
+    const { username } = req.query;
+    if (username && req.session) {
+      req.session.pendingUsername = username as string;
+      console.log('세션에 username 저장됨:', username);
+      // 세션 저장이 완료될 때까지 기다림
+      req.session.save((err: Error) => {
+        if (err) {
+          console.error('세션 저장 오류:', err);
+          return res.redirect(`${process.env.FRONTEND_URL}/login?error=session_error`);
+        }
+        next();
+      });
+    } else {
+      next();
+    }
+  },
   passport.authenticate('google', { 
     scope: ['profile', 'email'],
-    failureRedirect: `${process.env.FRONTEND_URL}/login?error=auth_failed`
+    session: true
   })
 );
 
