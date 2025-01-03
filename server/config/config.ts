@@ -63,4 +63,9 @@ if (!process.env.CONFIG_LOGGED) {
   process.env.CONFIG_LOGGED = 'true';
 }
 
+console.log('Kakao Config:', {
+  clientId: config.kakao.clientId,
+  callbackUrl: config.kakao.callbackUrl
+});
+
 export default config;

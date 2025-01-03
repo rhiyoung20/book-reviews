@@ -33,7 +33,8 @@ router.get(
   (req, res, next) => {
     console.log('Google 콜백 도착:', { 
       query: req.query,
-      code: req.query.code
+      code: req.query.code,
+      username: req.query.username  // username 확인
     });
     next();
   },
@@ -54,11 +55,12 @@ router.get(
       }
 
       const token = generateToken(user);
-      console.log('Google 로그인 성공:', { 
+      console.log('Google OAuth 성공:', { 
         username: user.username,
         hasToken: !!token 
       });
 
+      // 성공 시 메인 페이지로 리다이렉트
       res.redirect(
         `${process.env.FRONTEND_URL}/?token=${token}&username=${encodeURIComponent(
           user.username
@@ -87,7 +89,7 @@ router.get('/kakao',
     next();
   },
   passport.authenticate('kakao', {
-    state: Math.random().toString(36).substring(7)
+    session: true
   })
 );
 
@@ -226,18 +228,64 @@ router.post('/prepare-signup', async (req: Request, res: Response) => {
 // Google 회원가입
 router.get('/google/signup',
   (req: Request, res: Response, next: NextFunction) => {
-    const { username } = req.query;
-    if (!username) {
+    console.log('Google 회원가입 시도 - 세션:', { 
+      sessionId: req.sessionID,
+      username: req.session?.pendingUsername 
+    });
+    
+    if (!req.session?.pendingUsername) {
       return res.redirect(`${process.env.FRONTEND_URL}/signup?error=username_required`);
-    }
-    if (req.session) {
-      req.session.pendingUsername = username as string;
     }
     next();
   },
   passport.authenticate('google', { 
-    scope: ['profile', 'email']
+    scope: ['profile', 'email'],
+    session: true  // 세션 사용 명시
   })
+);
+
+// Kakao 회원가입
+router.get('/kakao/signup',
+  (req: Request, res: Response, next: NextFunction) => {
+    console.log('Kakao 회원가입 시작:', {
+      sessionId: req.sessionID,
+      username: req.session?.pendingUsername
+    });
+    
+    if (!req.session?.pendingUsername) {
+      return res.redirect(`${process.env.FRONTEND_URL}/signup?error=username_required`);
+    }
+    next();
+  },
+  passport.authenticate('kakao-signup', {
+    authType: 'reauthenticate',
+    prompt: 'login',
+    state: Math.random().toString(36).substring(7)
+  } as any)
+);
+
+// Kakao 회원가입 콜백
+router.get('/kakao/signup/callback',
+  passport.authenticate('kakao', { 
+    session: true,
+    failureRedirect: `${process.env.FRONTEND_URL}/signup?error=auth_failed`
+  }),
+  async (req: Request, res: Response) => {
+    try {
+      const user = req.user as User;
+      if (!user) {
+        throw new Error('사용자를 찾을 수 없습니다.');
+      }
+
+      const token = generateToken(user);
+      res.redirect(
+        `${process.env.FRONTEND_URL}/?token=${token}&username=${encodeURIComponent(user.username)}&status=success`
+      );
+    } catch (error) {
+      console.error('Kakao 회원가입 콜백 오류:', error);
+      res.redirect(`${process.env.FRONTEND_URL}/signup?error=auth_failed`);
+    }
+  }
 );
 
 export default router;

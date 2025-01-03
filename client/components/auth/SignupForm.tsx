@@ -68,9 +68,18 @@ export default function SignupForm({ onClose, switchToLogin }: SignupFormProps) 
 
       setIsLoading(true);
       
-      // Google OAuth 시작 (username을 쿼리 파라미터로 전달)
-      const googleAuthUrl = `${process.env.NEXT_PUBLIC_API_URL}/api/auth/google/signup?username=${encodeURIComponent(formData.username)}`;
-      window.location.href = googleAuthUrl;
+      // prepare-signup 호출
+      const response = await axiosInstance.post('/api/auth/prepare-signup', 
+        { username: formData.username },
+        { withCredentials: true }
+      );
+
+      if (response.data.success) {
+        // 직접 리다이렉트
+        window.location.href = `${process.env.NEXT_PUBLIC_API_URL}/api/auth/google/signup`;
+      } else {
+        throw new Error('사용자명 저장 실패');
+      }
     } catch (error) {
       console.error('Google 회원가입 오류:', error);
       alert('회원가입 처리 중 오류가 발생했습니다.');
@@ -78,16 +87,31 @@ export default function SignupForm({ onClose, switchToLogin }: SignupFormProps) 
     }
   };
 
-  const handleKakaoSignup = async (username: string) => {
+  const handleKakaoSignup = async () => {
     try {
-      // prepare-signup 엔드포인트 호출
-      await axiosInstance.post('/api/auth/prepare-signup', { username });
+      if (!formData.username || !isUsernameVerified) {
+        alert('사용자명을 확인해주세요.');
+        return;
+      }
+
+      setIsLoading(true);
       
-      // 카카오 로그인 페이지로 리다이렉트 (전체 URL 사용)
-      window.location.href = `${process.env.NEXT_PUBLIC_API_URL}/api/auth/kakao?username=${encodeURIComponent(username)}`;
+      // prepare-signup 호출
+      const response = await axiosInstance.post('/api/auth/prepare-signup', 
+        { username: formData.username },
+        { withCredentials: true }
+      );
+
+      if (response.data.success) {
+        // 직접 리다이렉트
+        window.location.href = `${process.env.NEXT_PUBLIC_API_URL}/api/auth/kakao/signup`;
+      } else {
+        throw new Error('사용자명 저장 실패');
+      }
     } catch (error) {
       console.error('Kakao 회원가입 오류:', error);
-      alert('카카오 회원가입 처리 중 오류가 발생했습니다.');
+      alert('회원가입 처리 중 오류가 발생했습니다.');
+      setIsLoading(false);
     }
   };
 
@@ -140,8 +164,8 @@ export default function SignupForm({ onClose, switchToLogin }: SignupFormProps) 
           <SocialLogin 
             onGoogleLogin={handleGoogleSignup}
             onKakaoLogin={handleKakaoSignup}
-            isLoading={isLoading}
-            username={formData.username}
+            isLoading={isLoading}            
+            mode="signup"
           />
 
           <div className="text-center">
