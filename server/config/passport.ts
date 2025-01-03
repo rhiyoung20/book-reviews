@@ -45,41 +45,57 @@ const kakaoStrategyConfig: KakaoStrategyConfig = {
   passReqToCallback: true
 };
 
-// Google Strategy 설정
+// Google Strategy 등록
 passport.use(
-  'google',
   new GoogleStrategy(
     googleStrategyConfig,
-    async (req: Request, accessToken: string, refreshToken: string, profile: any, done: any) => {
+    async (req: Request, accessToken: string, refreshToken: string, profile: Profile, done: VerifyCallback) => {
       try {
-        console.log('Google 인증 시작:', { 
-          session: req.session,
-          pendingUsername: req.session?.pendingUsername 
+        console.log('Google Profile:', { 
+          id: profile.id,
+          emails: profile.emails,
+          displayName: profile.displayName
         });
 
-        const pendingUsername = req.session?.pendingUsername;
-        if (!pendingUsername) {
-          return done(new Error('사용자명이 필요합니다.'));
+        const email = profile.emails?.[0]?.value;
+        if (!email) {
+          console.error('Google 로그인: 이메일 정보 없음');
+          return done(null, false, { message: '이메일 정보를 가져올 수 없습니다.' });
         }
 
-        // username으로 기존 사용자 찾기
-        let user = await User.findOne({ 
-          where: { username: pendingUsername }
+        const googleId = email.split('@')[0];
+        console.log('Google OAuth 정보:', { 
+          email, 
+          googleId,
+          profileId: profile.id 
         });
-        
-        if (!user) {
-          // 새 사용자 생성
-          user = await User.create({
-            username: pendingUsername,
-            googleId: profile.id
+
+        // 회원가입 시도인 경우
+        if (req.path.includes('/signup')) {
+          const username = req.query.username as string;
+          if (!username) {
+            return done(null, false, { message: '사용자명이 필요합니다.' });
+          }
+
+          // 새 사용자 생성 (이메일의 @ 앞부분을 googleId로 저장)
+          const newUser = await User.create({
+            username,
+            googleId
           });
-          console.log('새 사용자 생성됨:', user.toJSON());
+
+          return done(null, newUser);
         }
-        
+
+        // 로그인 시도인 경우 (이메일의 @ 앞부분으로 찾기)
+        const user = await User.findOne({ where: { googleId } });
+        if (!user) {
+          return done(null, false, { message: '등록되지 않은 사용자입니다. 회원가입이 필요합니다.' });
+        }
+
         return done(null, user);
       } catch (error) {
-        console.error('Passport Google 전략 오류:', error);
-        return done(error);
+        console.error('Google Strategy Error:', error);
+        return done(null, false, { message: '처리 중 오류가 발생했습니다.' });
       }
     }
   )

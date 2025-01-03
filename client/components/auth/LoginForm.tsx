@@ -11,7 +11,7 @@ interface LoginFormProps {
 
 export default function LoginForm({ onClose, switchToSignup }: LoginFormProps) {
   const router = useRouter()
-  const { setUsername } = useUser()
+  const { username, setUsername } = useUser()
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -84,7 +84,7 @@ export default function LoginForm({ onClose, switchToSignup }: LoginFormProps) {
           <SocialLogin 
             onGoogleLogin={handleGoogleLogin}
             onKakaoLogin={handleKakaoLogin}
-            isLoading={isLoading}
+            isLoading={isLoading}           
           />
           
           <div className="relative">

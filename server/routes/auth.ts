@@ -21,49 +21,56 @@ const generateToken = (user: Express.User) => {
 
 // Google OAuth
 router.get('/google', 
-  (req: Request, res: Response, next: NextFunction) => {
-    console.log('Google 로그인 요청 받음');
-    const { username } = req.query;
-    if (username && req.session) {
-      req.session.pendingUsername = username as string;
-    }
-    next();
-  },
   passport.authenticate('google', { 
     scope: ['profile', 'email'],
-    state: Math.random().toString(36).substring(7)
+    failureRedirect: `${process.env.FRONTEND_URL}/login?error=auth_failed`
   })
 );
 
 // Google 콜백
 router.get(
   '/google/callback',
-  passport.authenticate('google', { session: false }),
+  (req, res, next) => {
+    console.log('Google 콜백 도착:', { 
+      query: req.query,
+      code: req.query.code
+    });
+    next();
+  },
+  passport.authenticate('google', { 
+    session: false,
+    failureRedirect: `${process.env.FRONTEND_URL}/login?error=auth_failed`
+  }),
   async (req: Request, res: Response) => {
     try {
       const user = req.user as User;
-      if (!user || !user.username) {
-        throw new Error('사용자를 찾을 수 없습니다.');
+      if (!user) {
+        console.error('Google 콜백: 사용자 정보 없음');
+        return res.redirect(
+          `${process.env.FRONTEND_URL}/login?error=auth_failed&message=${encodeURIComponent(
+            '사용자 정보를 찾을 수 없습니다.'
+          )}`
+        );
       }
 
-      // username으로 사용자 재조회
-      const verifiedUser = await User.findOne({
-        where: { username: user.username }
+      const token = generateToken(user);
+      console.log('Google 로그인 성공:', { 
+        username: user.username,
+        hasToken: !!token 
       });
 
-      if (!verifiedUser) {
-        throw new Error('사용자를 찾을 수 없습니다.');
-      }
-
-      const token = generateToken(verifiedUser);
-      console.log('생성된 토큰:', token);
-
       res.redirect(
-        `${process.env.FRONTEND_URL}/?token=${token}&username=${encodeURIComponent(verifiedUser.username)}&status=success`
+        `${process.env.FRONTEND_URL}/?token=${token}&username=${encodeURIComponent(
+          user.username
+        )}&status=success`
       );
     } catch (error) {
-      console.error('Google 콜백 오류:', error);
-      res.redirect(`${process.env.FRONTEND_URL}/login?error=auth_failed`);
+      console.error('Google 콜백 처리 오류:', error);
+      res.redirect(
+        `${process.env.FRONTEND_URL}/login?error=auth_failed&message=${encodeURIComponent(
+          'Google 로그인 처리 중 오류가 발생했습니다.'
+        )}`
+      );
     }
   }
 );
@@ -180,7 +187,7 @@ router.post('/signup', async (req: Request, res: Response) => {
   }
 });
 
-// prepare-signup 엔드포인트 추가
+// prepare-signup 엔드포인트
 router.post('/prepare-signup', async (req: Request, res: Response) => {
   try {
     const { username } = req.body;
@@ -197,6 +204,8 @@ router.post('/prepare-signup', async (req: Request, res: Response) => {
     if (req.session) {
       req.session.pendingUsername = username;
       console.log('세션에 저장된 username:', req.session.pendingUsername);
+      // 세션 저장이 완료될 때까지 기다림
+      await new Promise((resolve) => req.session.save(resolve));
     } else {
       throw new Error('세션이 없습니다.');
     }
@@ -213,5 +222,22 @@ router.post('/prepare-signup', async (req: Request, res: Response) => {
     });
   }
 });
+
+// Google 회원가입
+router.get('/google/signup',
+  (req: Request, res: Response, next: NextFunction) => {
+    const { username } = req.query;
+    if (!username) {
+      return res.redirect(`${process.env.FRONTEND_URL}/signup?error=username_required`);
+    }
+    if (req.session) {
+      req.session.pendingUsername = username as string;
+    }
+    next();
+  },
+  passport.authenticate('google', { 
+    scope: ['profile', 'email']
+  })
+);
 
 export default router;

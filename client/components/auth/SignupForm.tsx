@@ -60,33 +60,20 @@ export default function SignupForm({ onClose, switchToLogin }: SignupFormProps) 
   }
 
   const handleGoogleSignup = async () => {
-    console.log('Google 회원가입 시도 시작');
-    
-    if (!isUsernameVerified) {
-      alert('먼저 사용자명 중복확인을 해주세요.');
-      return;
-    }
-
     try {
-      setIsLoading(true);
-      console.log('API 요청 시작:', {
-        url: '/api/auth/prepare-signup',
-        username: formData.username
-      });
-      
-      const prepareResponse = await axiosInstance.post('/api/auth/prepare-signup', {
-        username: formData.username
-      });
-      console.log('prepare-signup 응답:', prepareResponse);
+      if (!formData.username || !isUsernameVerified) {
+        alert('사용자명을 확인해주세요.');
+        return;
+      }
 
-      const googleAuthUrl = `${process.env.NEXT_PUBLIC_API_URL}/api/auth/google`;
-      console.log('리다이렉트 URL:', googleAuthUrl);
+      setIsLoading(true);
       
+      // Google OAuth 시작 (username을 쿼리 파라미터로 전달)
+      const googleAuthUrl = `${process.env.NEXT_PUBLIC_API_URL}/api/auth/google/signup?username=${encodeURIComponent(formData.username)}`;
       window.location.href = googleAuthUrl;
-    } catch (error: any) {
-      console.error('Google 회원가입 상세 오류:', error);
+    } catch (error) {
+      console.error('Google 회원가입 오류:', error);
       alert('회원가입 처리 중 오류가 발생했습니다.');
-    } finally {
       setIsLoading(false);
     }
   };
