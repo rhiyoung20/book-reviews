@@ -1,6 +1,6 @@
 import express from 'express';
 import type { Response, RequestHandler } from 'express';
-import { CustomRequest } from '../types/auth';
+import { RequestWithUser } from '../types/auth';
 import {
   createComment,
   deleteComment,
@@ -14,10 +14,10 @@ const router = express.Router();
 
 // 타입 안전한 비동기 핸들러
 const asyncHandler = (
-  fn: (req: CustomRequest, res: Response) => Promise<Response | void | undefined>
+  fn: (req: RequestWithUser, res: Response) => Promise<Response | void | undefined>
 ): RequestHandler => {
   return (req, res, next): void => {
-    Promise.resolve(fn(req as CustomRequest, res)).catch((error: unknown) => next(error));
+    Promise.resolve(fn(req as RequestWithUser, res)).catch((error: unknown) => next(error));
   };
 };
 

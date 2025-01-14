@@ -1,250 +1,232 @@
-import express, { Request, Response, NextFunction, RequestHandler } from 'express';
-import { Review, User } from '../models';
+import express from 'express';
+import { Request, Response } from 'express';
 import { Op } from 'sequelize';
 import verifyToken from '../middleware/auth';
 import { RequestWithUser } from '../types/auth';
-
-// Review 모델의 속성 타입 정의
-interface ReviewAttributes {
-  id: number;
-  title: string;
-  bookTitle: string;
-  publisher?: string;
-  bookAuthor?: string;
-  content: string;
-  username: string;
-  views: number;
-  createdAt: Date;
-  updatedAt?: Date;
-}
-
-// Review 생성 시 필요한 속성만 정의한 인터페이스
-type CreateReviewData = Omit<ReviewAttributes, 'id' | 'views' | 'createdAt' | 'updatedAt'>;
+import { Review, User } from '../models';
 
 const router = express.Router();
 
-// Define asyncHandler function
-const asyncHandler = (fn: (req: Request, res: Response, next: NextFunction) => Promise<any>): RequestHandler => {
-  return async (req, res, next) => {
-    try {
-      await fn(req, res, next);
-    } catch (error) {
-      next(error);
-    }
-  };
-};
-
 // 리뷰 목록 조회
-router.get('/', asyncHandler(async (req: Request, res: Response) => {
-  const page = Number(req.query.page) || 1;
-  const limit = 10;
-  const offset = (page - 1) * limit;
-  const type = req.query.type as string;
-  const term = req.query.term as string;
+router.get('/', async (req: Request, res: Response) => {
+  try {
+    const page = Number(req.query.page) || 1;
+    const limit = 10;
+    const offset = (page - 1) * limit;
+    const type = req.query.type as string;
+    const term = req.query.term as string;
 
-  let whereClause = {};
-  if (type && term) {
-    whereClause = {
-      [type]: {
-        [Op.like]: `%${term}%`
-      }
-    };
+    let whereClause = {};
+    if (type && term) {
+      whereClause = {
+        [type]: {
+          [Op.like]: `%${term}%`
+        }
+      };
+    }
+
+    const [reviews, total] = await Promise.all([
+      Review.findAll({
+        where: whereClause,
+        include: [{
+          model: User,
+          as: 'user',
+          attributes: ['username']
+        }],
+        offset,
+        limit,
+        order: [['createdAt', 'DESC']]
+      }),
+      Review.count({ where: whereClause })
+    ]);
+
+    return res.json({
+      success: true,
+      reviews,
+      currentPage: page,
+      totalPages: Math.ceil(total / limit),
+      totalReviews: total
+    });
+  } catch (error) {
+    console.error('리뷰 목록 조회 오류:', error);
+    return res.status(500).json({
+      success: false,
+      message: '리뷰 목록을 불러오는데 실패했습니다.'
+    });
   }
+});
 
-  const [reviews, total] = await Promise.all([
-    Review.findAll({
-      where: whereClause,
+// 단일 리뷰 조회
+router.get('/:id', async (req: Request, res: Response) => {
+  try {
+    const reviewId = parseInt(req.params.id);
+    
+    if (isNaN(reviewId)) {
+      return res.status(400).json({
+        success: false,
+        message: '유효하지 않은 리뷰 ID입니다.'
+      });
+    }
+
+    const review = await Review.findOne({
+      where: { id: reviewId },
       include: [{
         model: User,
         as: 'user',
         attributes: ['username']
-      }],
-      offset,
-      limit,
-      order: [['createdAt', 'DESC']]
-    }),
-    Review.count({ where: whereClause })
-  ]);
-
-  return res.json({
-    success: true,
-    reviews,
-    currentPage: page,
-    totalPages: Math.ceil(total / limit),
-    totalReviews: total
-  });
-}));
-
-// 리뷰 수정
-router.put('/:id', verifyToken, asyncHandler(async (req: Request, res: Response) => {
-  const { content, title, bookTitle, publisher, bookAuthor } = req.body;
-  const reviewId = parseInt(req.params.id);
-  const user = (req as RequestWithUser).user;
-  
-  if (!user?.username) {
-    return res.status(401).json({
-      success: false,
-      message: '인증이 필요합니다.'
+      }]
     });
-  }
 
-  // 리뷰 존재 여부 확인
-  const existingReview = await Review.findOne({
-    where: {
-      id: reviewId,
-      '$user.username$': user.username
-    },
-    include: [{
-      model: User,
-      as: 'user',
-      attributes: ['username']
-    }]
-  });
-
-    if (!existingReview) {
-      return res.status(404).json({
-        success: false,
-        message: '리뷰를 찾을 수 없습니다.'
+    if (!review) {
+      return res.status(404).json({ 
+        success: false, 
+        message: '리뷰를 찾을 수 없습니다.' 
       });
     }
 
-  // 리뷰 업데이트
-  await existingReview.update({
-    ...(content && { content }),
-    ...(title && { title }),
-    ...(bookTitle && { bookTitle }),
-    ...(publisher && { publisher }),
-    ...(bookAuthor && { bookAuthor })
-  });
+    await review.increment('views');
+    const reviewData = review.toJSON();
 
-  return res.json({
-    success: true,
-    review: existingReview
-  });
-}));
-
-// 리뷰 삭제
-router.delete('/:id', verifyToken, asyncHandler(async (req: Request, res: Response) => {
-  const reviewId = parseInt(req.params.id);
-  const user = (req as RequestWithUser).user;
-  
-  if (!user?.username) {
-    return res.status(401).json({
+    return res.json({
+      success: true,
+      review: {
+        ...reviewData,
+        views: reviewData.views + 1
+      }
+    });
+  } catch (error) {
+    console.error('리뷰 조회 오류:', error);
+    return res.status(500).json({
       success: false,
-      message: '인증이 필요합니다.'
+      message: '리뷰를 불러오는데 실패했습니다.'
     });
   }
+});
 
-  // 리뷰 존재 여부 확인
-  const existingReview = await Review.findOne({
-    where: {
-      id: reviewId,
-      '$user.username$': user.username
-    },
-    include: [{
-      model: User,
-      as: 'user',
-      attributes: ['username']
-    }]
-  });
+// 리뷰 생성
+router.post('/', verifyToken, async (req: RequestWithUser, res: Response) => {
+  try {
+    const { title, content, bookTitle, bookAuthor, publisher } = req.body;
+    const username = req.user?.username;
 
-    if (!existingReview) {
+    if (!username) {
+      return res.status(401).json({
+        success: false,
+        message: '인증이 필요합니다.'
+      });
+    }
+
+    const review = await Review.create({
+      title,
+      content,
+      bookTitle,
+      bookAuthor,
+      publisher,
+      username
+    });
+
+    return res.status(201).json({
+      success: true,
+      review
+    });
+  } catch (error) {
+    console.error('리뷰 생성 오류:', error);
+    return res.status(500).json({
+      success: false,
+      message: '리뷰 생성에 실패했습니다.'
+    });
+  }
+});
+
+// 리뷰 수정
+router.put('/:id', verifyToken, async (req: RequestWithUser, res: Response) => {
+  try {
+    const reviewId = parseInt(req.params.id);
+    const { title, content, bookTitle, bookAuthor, publisher } = req.body;
+    const username = req.user?.username;
+
+    if (!username) {
+      return res.status(401).json({
+        success: false,
+        message: '인증이 필요합니다.'
+      });
+    }
+
+    const review = await Review.findOne({
+      where: { 
+        id: reviewId,
+        username
+      }
+    });
+
+    if (!review) {
+      return res.status(404).json({
+        success: false,
+        message: '리뷰를 찾을 수 없거나 수정 권한이 없습니다.'
+      });
+    }
+
+    await review.update({
+      ...(title && { title }),
+      ...(content && { content }),
+      ...(bookTitle && { bookTitle }),
+      ...(bookAuthor && { bookAuthor }),
+      ...(publisher && { publisher })
+    });
+
+    return res.json({
+      success: true,
+      review
+    });
+  } catch (error) {
+    console.error('리뷰 수정 오류:', error);
+    return res.status(500).json({
+      success: false,
+      message: '리뷰 수정에 실패했습니다.'
+    });
+  }
+});
+
+// 리뷰 삭제
+router.delete('/:id', verifyToken, async (req: RequestWithUser, res: Response) => {
+  try {
+    const reviewId = parseInt(req.params.id);
+    const username = req.user?.username;
+
+    if (!username) {
+      return res.status(401).json({
+        success: false,
+        message: '인증이 필요합니다.'
+      });
+    }
+
+    const review = await Review.findOne({
+      where: {
+        id: reviewId,
+        username
+      }
+    });
+
+    if (!review) {
       return res.status(404).json({
         success: false,
         message: '리뷰를 찾을 수 없거나 삭제 권한이 없습니다.'
       });
     }
 
-  await existingReview.destroy();
+    await review.destroy();
 
-  return res.json({
-    success: true,
-    message: '리뷰가 삭제되었습니다.'
-  });
-}));
-
-// 리뷰 생성
-router.post('/', verifyToken, asyncHandler(async (req: Request, res: Response) => {
-  const { title, bookTitle, publisher, bookAuthor, content } = req.body;
-  const user = (req as RequestWithUser).user;
-  
-  if (!user?.username) {
-    return res.status(401).json({
+    return res.json({
+      success: true,
+      message: '리뷰가 삭제되었습니다.'
+    });
+  } catch (error) {
+    console.error('리뷰 삭제 오류:', error);
+    return res.status(500).json({
       success: false,
-      message: '인증이 필요합니다.'
+      message: '리뷰 삭제에 실패했습니다.'
     });
   }
-
-  // 필수 필드 검증
-  if (!title || !bookTitle || !content) {
-    return res.status(400).json({
-      success: false,
-      message: '필수 항목이 누락되었습니다.'
-    });
-  }
-
-  // 리뷰 생성 데이터 준비
-  const reviewData = {
-    title,
-    bookTitle,
-    publisher,
-    bookAuthor,
-    content,
-    username: user.username,
-    views: 0  // 명시적으로 초기값 설정
-  };
-
-  // 리뷰 생성
-  const review = await Review.create(reviewData as ReviewAttributes);
-
-  return res.status(201).json({
-    success: true,
-    review
-  });      
-}));
-
-// 단일 리뷰 조회 라우트
-router.get('/:id', asyncHandler(async (req: Request, res: Response) => {
-  const reviewId = parseInt(req.params.id);
-
-  const review = await Review.findOne({
-    where: { id: reviewId },
-    attributes: [
-      'id', 
-      'title', 
-      'content', 
-      'username',
-      'bookTitle',
-      'bookAuthor',
-      'publisher',
-      'views',
-      'createdAt'
-    ]
-  });
-
-  if (!review) {
-    return res.status(404).json({ success: false, message: '리뷰를 찾을 수 없습니다.' });
-  }
-
-  // 조회수 증가
-  await review.increment('views');
-
-  const reviewData = review.toJSON() as ReviewAttributes;
-  
-  // MySQL datetime 문자열을 ISO 형식으로 변환
-  const createdAtStr = reviewData.createdAt.toString();
-  const formattedDate = createdAtStr.replace(' ', 'T') + '.000Z';
-  
-  const responseData = {
-    success: true,
-    review: {
-      ...reviewData,
-      createdAt: formattedDate,  // ISO 형식으로 변환된 날짜
-      views: reviewData.views + 1
-    }
-  };
-
-  return res.json(responseData);
-}));
+});
 
 export default router;

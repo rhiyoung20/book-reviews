@@ -1,29 +1,20 @@
 import type { Response, NextFunction } from 'express-serve-static-core';
-import prisma from '../lib/prisma';
-import type { CustomRequest } from '../types/auth';
+import type { RequestWithUser } from '../types/auth';
 import type { Request } from 'express';
-import { User } from '../models';
+import { User, Review, Comment } from '../models';
 
 // 사용자의 리뷰 목록 조회
-export const getUserReviews = async (req: CustomRequest, res: Response, next: NextFunction) => {
+export const getUserReviews = async (req: RequestWithUser, res: Response) => {
   try {
-    if (!req.user) {
+    if (!req.user?.username) {
       return res.status(401).json({ message: '인증되지 않은 사용자입니다.' });
     }
 
-    const userId = req.params.userId || req.user.id;
-
-    // 다른 사용자의 정보를 요청할 경우 관리자 권한 체크
-    if (userId !== req.user.id && !User.isAdminUsername(req.user.username)) {
-      return res.status(403).json({ message: '권한이 없습니다.' });
-    }
-    
-    const reviews = await prisma.$queryRaw`
-      SELECT id, title, bookTitle, createdAt, views 
-      FROM Review 
-      WHERE userId = ${Number(userId)} 
-      ORDER BY createdAt DESC
-    `;
+    const reviews = await Review.findAll({
+      where: { username: req.user.username },
+      order: [['createdAt', 'DESC']],
+      attributes: ['id', 'title', 'bookTitle', 'createdAt', 'views']
+    });
 
     return res.json({ reviews });
   } catch (error) {
@@ -32,26 +23,21 @@ export const getUserReviews = async (req: CustomRequest, res: Response, next: Ne
 };
 
 // 사용자의 댓글 목록 조회
-export const getUserComments = async (req: CustomRequest, res: Response) => {
+export const getUserComments = async (req: RequestWithUser, res: Response) => {
   try {
-    if (!req.user) {
+    if (!req.user?.username) {
       return res.status(401).json({ message: '인증되지 않은 사용자입니다.' });
     }
 
-    const userId = req.params.userId || req.user.id;
-
-    // 다른 사용자의 정보를 요청할 경우 관리자 권한 체크
-    if (userId !== req.user.id && !User.isAdminUsername(req.user.username)) {
-      return res.status(403).json({ message: '권한이 없습니다.' });
-    }
-    
-    const comments = await prisma.$queryRaw`
-      SELECT c.id, c.content, c.createdAt, r.id as reviewId, r.title as reviewTitle
-      FROM Comment c
-      JOIN Review r ON c.reviewId = r.id
-      WHERE c.userId = ${Number(userId)}
-      ORDER BY c.createdAt DESC
-    `;
+    const comments = await Comment.findAll({
+      where: { username: req.user.username },
+      include: [{
+        model: Review,
+        as: 'review',
+        attributes: ['id', 'title']
+      }],
+      order: [['createdAt', 'DESC']]
+    });
 
     return res.json({ comments });
   } catch (error) {
@@ -72,7 +58,7 @@ export const checkUsername = async (req: CheckUsernameRequest, res: Response) =>
       });
     }
 
-    const existingUser = await prisma.user.findUnique({
+    const existingUser = await User.findOne({
       where: { username: username.trim() }
     });
 

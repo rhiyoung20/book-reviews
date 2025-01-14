@@ -1,25 +1,19 @@
 import { Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import config from '../config/config';
-import prisma from '../lib/prisma';
-import { User } from "../models";
+import { User } from '../models';
 import { RequestWithUser } from '../types/auth';
 
 // User 타입 정의 수정
 interface CustomUser extends User {
   id: number;
-  username: string;  // undefined 허용하지 않음
+  username: string;
   googleId?: string;
   kakaoId?: string;
 }
 
-// Request 타입 수정
-interface CustomRequest extends Request {
-  user?: CustomUser;  // User 타입으로 변경
-}
-
-// 소셜 로그인 성공 시 처리
-export const socialLoginSuccess = async (req: CustomRequest, res: Response) => {
+// socialLoginSuccess 함수 수정
+export const socialLoginSuccess = async (req: RequestWithUser, res: Response) => {
   try {
     const { user } = req;
     if (!user) {
@@ -47,9 +41,7 @@ export const checkUsername = async (req: Request, res: Response) => {
   try {
     const { username } = req.body;
     
-    const user = await prisma.user.findUnique({
-      where: { username }
-    });
+    const user = await User.findOne({ where: { username } });
     
     res.json({
       success: true,

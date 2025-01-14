@@ -1,35 +1,25 @@
 import type { Response } from 'express';
-import { CustomRequest } from '../types/auth';
-import prisma from '../lib/prisma';
-import { User } from '../models';
+import { RequestWithUser } from '../types/auth';
+import { Comment, Review, User } from '../models';
 
 // 댓글 생성
-export const createComment = async (req: CustomRequest, res: Response) => {
+export const createComment = async (req: RequestWithUser, res: Response) => {
   try {
     const { content } = req.body;
     const { reviewId } = req.params;
-    const userId = req.user?.id;
+    const username = req.user?.username;
 
-    if (!userId) {
+    if (!username) {
       return res.status(401).json({
         success: false,
         message: '인증이 필요합니다.'
       });
     }
 
-    const comment = await prisma.comment.create({
-      data: {
-        content,
-        userId,
-        reviewId: parseInt(reviewId)
-      },
-      include: {
-        user: {
-          select: {
-            username: true
-          }
-        }
-      }
+    const comment = await Comment.create({
+      content,
+      username,
+      reviewId: parseInt(reviewId)
     });
 
     return res.status(201).json({
@@ -46,23 +36,19 @@ export const createComment = async (req: CustomRequest, res: Response) => {
 };
 
 // 댓글 목록 조회
-export const getComments = async (req: CustomRequest, res: Response) => {
+export const getComments = async (req: RequestWithUser, res: Response) => {
   try {
     const { reviewId } = req.params;
-    const comments = await prisma.comment.findMany({
+    const comments = await Comment.findAll({
       where: { 
         reviewId: parseInt(reviewId) 
       },
-      include: {
-        user: {
-          select: {
-            username: true
-          }
-        }
-      },
-      orderBy: {
-        createdAt: 'asc'
-      }
+      include: [{
+        model: User,
+        as: 'user',
+        attributes: ['username']
+      }],
+      order: [['createdAt', 'ASC']]
     });
 
     return res.json({
@@ -79,40 +65,30 @@ export const getComments = async (req: CustomRequest, res: Response) => {
 };
 
 // 사용자별 댓글 조회
-export const getUserComments = async (req: CustomRequest, res: Response) => {
+export const getUserComments = async (req: RequestWithUser, res: Response) => {
   try {
     const { username } = req.params;
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 5;
-    const skip = (page - 1) * limit;
+    const offset = (page - 1) * limit;
 
     const [comments, total] = await Promise.all([
-      prisma.comment.findMany({
-        where: {
-          user: {
-            username
-          }
-        },
-        include: {
-          review: true,
-          user: {
-            select: {
-              username: true
-            }
-          }
-        },
-        orderBy: {
-          createdAt: 'desc'
-        },
-        take: limit,
-        skip
+      Comment.findAll({
+        where: { username },
+        include: [{
+          model: Review,
+          as: 'review'
+        }, {
+          model: User,
+          as: 'user',
+          attributes: ['username']
+        }],
+        order: [['createdAt', 'DESC']],
+        limit,
+        offset
       }),
-      prisma.comment.count({
-        where: {
-          user: {
-            username
-          }
-        }
+      Comment.count({
+        where: { username }
       })
     ]);
 
@@ -133,20 +109,20 @@ export const getUserComments = async (req: CustomRequest, res: Response) => {
 };
 
 // 댓글 수정
-export const updateComment = async (req: CustomRequest, res: Response) => {
+export const updateComment = async (req: RequestWithUser, res: Response) => {
   try {
     const { id } = req.params;
     const { content } = req.body;
-    const userId = req.user?.id;
+    const username = req.user?.username;
 
-    if (!userId) {
+    if (!username) {
       return res.status(401).json({
         success: false,
         message: '인증이 필요합니다.'
       });
     }
 
-    const comment = await prisma.comment.findUnique({
+    const comment = await Comment.findOne({
       where: { id: parseInt(id) }
     });
 
@@ -157,28 +133,18 @@ export const updateComment = async (req: CustomRequest, res: Response) => {
       });
     }
 
-    if (comment.userId !== userId) {
+    if (comment.username !== username) {
       return res.status(403).json({
         success: false,
         message: '댓글을 수정할 권한이 없습니다.'
       });
     }
 
-    const updatedComment = await prisma.comment.update({
-      where: { id: parseInt(id) },
-      data: { content },
-      include: {
-        user: {
-          select: {
-            username: true
-          }
-        }
-      }
-    });
+    await comment.update({ content });
 
     return res.json({
       success: true,
-      comment: updatedComment
+      comment
     });
   } catch (error) {
     console.error('댓글 수정 오류:', error);
@@ -190,20 +156,19 @@ export const updateComment = async (req: CustomRequest, res: Response) => {
 };
 
 // 댓글 삭제
-export const deleteComment = async (req: CustomRequest, res: Response) => {
+export const deleteComment = async (req: RequestWithUser, res: Response) => {
   try {
     const { id } = req.params;
-    const userId = req.user?.id;
     const username = req.user?.username;
 
-    if (!userId || !username) {
+    if (!username) {
       return res.status(401).json({
         success: false,
         message: '인증이 필요합니다.'
       });
     }
 
-    const comment = await prisma.comment.findUnique({
+    const comment = await Comment.findOne({
       where: { id: parseInt(id) }
     });
 
@@ -214,16 +179,14 @@ export const deleteComment = async (req: CustomRequest, res: Response) => {
       });
     }
 
-    if (comment.userId !== userId && !User.isAdminUsername(username)) {
+    if (comment.username !== username) {
       return res.status(403).json({
         success: false,
         message: '댓글을 삭제할 권한이 없습니다.'
       });
     }
 
-    await prisma.comment.delete({
-      where: { id: parseInt(id) }
-    });
+    await comment.destroy();
 
     return res.json({
       success: true,

@@ -36,7 +36,7 @@ export default function SignupForm({ onClose, switchToLogin }: SignupFormProps) 
     }
 
     try {
-      const response = await axiosInstance.post('/api/auth/check-username', {
+      const response = await axiosInstance.post('/auth/check-username', {
         username
       })
 
@@ -69,7 +69,7 @@ export default function SignupForm({ onClose, switchToLogin }: SignupFormProps) 
       setIsLoading(true);
       
       // prepare-signup 호출
-      const response = await axiosInstance.post('/api/auth/prepare-signup', 
+      const response = await axiosInstance.post('/auth/prepare-signup', 
         { username: formData.username },
         { withCredentials: true }
       );
@@ -96,15 +96,18 @@ export default function SignupForm({ onClose, switchToLogin }: SignupFormProps) 
 
       setIsLoading(true);
       
-      // prepare-signup 호출
-      const response = await axiosInstance.post('/api/auth/prepare-signup', 
+      // 환경변수 값 확인을 위한 로그 추가
+      console.log('NEXT_PUBLIC_API_URL:', process.env.NEXT_PUBLIC_API_URL);
+      
+      const response = await axiosInstance.post('/auth/prepare-signup', 
         { username: formData.username },
         { withCredentials: true }
       );
 
       if (response.data.success) {
-        // 직접 리다이렉트
-        window.location.href = `${process.env.NEXT_PUBLIC_API_URL}/api/auth/kakao/signup`;
+        const redirectUrl = `${process.env.NEXT_PUBLIC_API_URL}/auth/kakao/signup`;
+        console.log('Redirect URL:', redirectUrl);  // 최종 URL 확인
+        window.location.href = redirectUrl;
       } else {
         throw new Error('사용자명 저장 실패');
       }

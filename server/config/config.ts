@@ -33,9 +33,10 @@ const config = {
     callbackUrl: `${BACKEND_URL}/api/auth/google/callback`
   },
   kakao: {
-    clientId: process.env.KAKAO_CLIENT_ID!,
-    clientSecret: process.env.KAKAO_CLIENT_SECRET!,
-    callbackUrl: `${BACKEND_URL}/api/auth/kakao/callback`
+    clientId: process.env.KAKAO_CLIENT_ID || '',
+    clientSecret: process.env.KAKAO_CLIENT_SECRET || '',
+    callbackUrl: process.env.KAKAO_LOGIN_CALLBACK_URL || '',
+    signupCallbackUrl: process.env.KAKAO_SIGNUP_CALLBACK_URL || ''
   },
   jwtSecret: process.env.JWT_SECRET!,
   sessionSecret: process.env.SESSION_SECRET!,

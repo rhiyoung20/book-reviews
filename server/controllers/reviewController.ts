@@ -1,10 +1,10 @@
 import type { Request, Response } from 'express';
-import prisma from '../lib/prisma';
-import { CustomRequest } from '../types/auth';
-import { Prisma } from '@prisma/client';
+import { Review, User, Comment } from '../models';
+import { RequestWithUser } from '../types/auth';
+import { Op } from 'sequelize';
 
 // 리뷰 생성
-export const createReview = async (req: CustomRequest, res: Response) => {
+export const createReview = async (req: RequestWithUser, res: Response) => {
   try {
     const { content, title, bookTitle, publisher, bookAuthor } = req.body;
     
@@ -22,21 +22,14 @@ export const createReview = async (req: CustomRequest, res: Response) => {
       });
     }
 
-    const review = await prisma.review.create({
-      data: {
-        title,
-        bookTitle,
-        content,
-        username: req.user.username,
-        views: 0,
-        ...(publisher && { publisher }),
-        ...(bookAuthor && { bookAuthor }),
-        user: {
-          connect: {
-            username: req.user.username
-          }
-        }
-      }
+    const review = await Review.create({
+      title,
+      bookTitle,
+      content,
+      username: req.user.username,
+      views: 0,
+      publisher,
+      bookAuthor
     });
 
     return res.json({
@@ -53,73 +46,89 @@ export const createReview = async (req: CustomRequest, res: Response) => {
 };
 
 // 리뷰 목록 조회
-export const getReviews = async (req: CustomRequest, res: Response) => {
+export const getReviews = async (req: Request, res: Response) => {
   try {
     const page = parseInt(req.query.page as string) || 1;
-    const limit = 10;
-    const skip = (page - 1) * limit;
-    const searchType = req.query.type as string;
-    const searchTerm = req.query.term as string;
-  
+    const limit = 10; // 페이지당 항목 수
+    const offset = (page - 1) * limit;
+
+    const { type, term } = req.query;
+    
     let whereClause = {};
-    if (searchType && searchTerm) {
+    if (type && term) {
       whereClause = {
-        [searchType === 'title' ? 'title' : 'username']: {
-          contains: searchTerm
+        [type === 'title' ? 'title' : 'username']: {
+          [Op.like]: `%${term}%`
         }
       };
     }
-  
-    const [reviews, total] = await Promise.all([
-      prisma.review.findMany({
-        where: whereClause,
-        orderBy: { createdAt: 'desc' },
-        take: limit,
-        skip
-      }),
-      prisma.review.count({ where: whereClause })
-    ]);
+
+    const { count, rows: reviews } = await Review.findAndCountAll({
+      where: whereClause,
+      include: [{
+        model: User,
+        as: 'user',
+        attributes: ['username']
+      }],
+      order: [['createdAt', 'DESC']],
+      limit,
+      offset
+    });
+
+    const totalPages = Math.ceil(count / limit);
 
     return res.json({
+      success: true,
       reviews,
       currentPage: page,
-      totalPages: Math.ceil(total / limit),
-      totalReviews: total
+      totalPages,
+      totalReviews: count
     });
   } catch (error) {
-    console.error('상세 에러 정보:', error);
-    return res.status(500).json({ 
-      message: '리뷰 목록을 불러오는 중 오류가 발생했습니다.',
-      error: error instanceof Error ? error.message : '알 수 없는 오류'
+    console.error('리뷰 목록 조회 오류:', error);
+    return res.status(500).json({
+      success: false,
+      message: '리뷰 목록을 불러오는데 실패했습니다.'
     });
   }
 };
 
 // 리뷰 조회
-export const getReview = async (req: CustomRequest, res: Response) => {
+export const getReview = async (req: RequestWithUser, res: Response) => {
   try {
     const reviewId = parseInt(req.params.id);
     
-    const review = await prisma.review.findUnique({
+    const review = await Review.findOne({
       where: { id: reviewId },
-      include: {
-        comments: true
-      }
+      include: [{
+        model: User,
+        as: 'user',
+        attributes: ['username']
+      }]
     });
 
     if (!review) {
-      return res.status(404).json({ message: '리뷰를 찾을 수 없습니다.' });
+      return res.status(404).json({ 
+        success: false,
+        message: '리뷰를 찾을 수 없습니다.' 
+      });
     }
 
-    return res.json(review);
+    return res.json({
+      success: true,
+      review
+    });
   } catch (error) {
     console.error('리뷰 조회 오류:', error);
-    return res.status(500).json({ message: '리뷰 조회 중 오류가 발생했습니다.' });
+    return res.status(500).json({ 
+      success: false,
+      message: '리뷰 조회 중 오류가 발생했습니다.' 
+    });
   }
 };
 
 // 리뷰 수정
-export const updateReview = async (req: CustomRequest, res: Response) => {
+export const updateReview = async (req: RequestWithUser, res: Response) => {
   try {
     const reviewId = parseInt(req.params.id);
     const { title, bookTitle, content, publisher, bookAuthor } = req.body;
@@ -131,39 +140,31 @@ export const updateReview = async (req: CustomRequest, res: Response) => {
       });
     }
 
-    const existingReview = await prisma.review.findUnique({
-      where: { id: reviewId },
-      include: { user: true }
+    const existingReview = await Review.findOne({
+      where: { 
+        id: reviewId,
+        username: req.user.username
+      }
     });
 
     if (!existingReview) {
       return res.status(404).json({
         success: false,
-        message: '리뷰를 찾을 수 없습니다.'
+        message: '리뷰를 찾을 수 없거나 수정 권한이 없습니다.'
       });
     }
 
-    if (existingReview.user.username !== req.user.username) {
-      return res.status(403).json({
-        success: false,
-        message: '리뷰를 수정할 권한이 없습니다.'
-      });
-    }
-
-    const updatedReview = await prisma.review.update({
-      where: { id: reviewId },
-      data: {
-        title,
-        bookTitle,
-        content,
-        ...(publisher && { publisher }),
-        ...(bookAuthor && { bookAuthor })
-      }
+    await existingReview.update({
+      ...(title && { title }),
+      ...(bookTitle && { bookTitle }),
+      ...(content && { content }),
+      ...(publisher && { publisher }),
+      ...(bookAuthor && { bookAuthor })
     });
 
     return res.json({
       success: true,
-      review: updatedReview
+      review: existingReview
     });
   } catch (error) {
     console.error('리뷰 수정 오류:', error);
@@ -175,28 +176,33 @@ export const updateReview = async (req: CustomRequest, res: Response) => {
 };
 
 // 리뷰 삭제
-export const deleteReview = async (req: CustomRequest, res: Response) => {
+export const deleteReview = async (req: RequestWithUser, res: Response) => {
   try {
     const reviewId = parseInt(req.params.id);
     const username = req.user?.username;
 
-    // 리뷰 존재 여부 및 작성자 확인
-    const existingReview = await prisma.review.findUnique({
-      where: { id: reviewId },
-      include: { user: true }
+    if (!username) {
+      return res.status(401).json({
+        success: false,
+        message: '인증이 필요합니다.'
+      });
+    }
+
+    const existingReview = await Review.findOne({
+      where: { 
+        id: reviewId,
+        username
+      }
     });
 
     if (!existingReview) {
-      return res.status(404).json({ message: '리뷰를 찾을 수 없습니다.' });
+      return res.status(404).json({ 
+        success: false,
+        message: '리뷰를 찾을 수 없거나 삭제 권한이 없습니다.' 
+      });
     }
 
-    if (existingReview.user.username !== username) {
-      return res.status(403).json({ message: '리뷰를 삭제할 권한이 없습니다.' });
-    }
-
-    await prisma.review.delete({
-      where: { id: reviewId }
-    });
+    await existingReview.destroy();
 
     return res.json({
       success: true,
@@ -204,6 +210,53 @@ export const deleteReview = async (req: CustomRequest, res: Response) => {
     });
   } catch (error) {
     console.error('리뷰 삭제 오류:', error);
-    return res.status(500).json({ message: '리뷰 삭제 중 오류가 발생했습니다.' });
+    return res.status(500).json({ 
+      success: false,
+      message: '리뷰 삭제 중 오류가 발생했습니다.' 
+    });
+  }
+};
+
+// 댓글 작성
+export const createComment = async (req: RequestWithUser, res: Response) => {
+  try {
+    const reviewId = parseInt(req.params.id);
+    const { content } = req.body;
+    
+    // 사용자 인증 확인
+    if (!req.user?.username) {
+      return res.status(401).json({
+        success: false,
+        message: '인증이 필요합니다.'
+      });
+    }
+
+    // 리뷰 존재 여부 확인
+    const review = await Review.findByPk(reviewId);
+    if (!review) {
+      return res.status(404).json({
+        success: false,
+        message: '리뷰를 찾을 수 없습니다.'
+      });
+    }
+
+    // 댓글 생성
+    const comment = await Comment.create({
+      content,
+      username: req.user.username,
+      reviewId
+    });
+
+    // 생성된 댓글 반환
+    return res.status(201).json({
+      success: true,
+      comment
+    });
+  } catch (error) {
+    console.error('댓글 작성 오류:', error);
+    return res.status(500).json({
+      success: false,
+      message: '댓글 작성 중 오류가 발생했습니다.'
+    });
   }
 };

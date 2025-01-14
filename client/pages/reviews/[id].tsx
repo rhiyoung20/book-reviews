@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { GetServerSideProps } from 'next';
 import Header from '@/components/Header';
-import axiosInstance from '@/utils/axios';
+import { axiosInstance } from '@/lib/axios';
+import { useUser } from '@/context/UserContext';
 
 interface ReviewData {
   id: number;
@@ -21,39 +22,67 @@ interface ReviewDetailProps {
 }
 
 export const getServerSideProps: GetServerSideProps = async ({ params }) => {
-  if (!params?.id) {
+  const { id } = params || {};
+  
+  if (!id) {
     return { notFound: true };
   }
 
   try {
-    console.log('요청 URL:', `/api/reviews/${params.id}`);
-    const response = await axiosInstance.get(`/api/reviews/${params.id}`);
-    console.log('서버 응답:', response.data);
+    const response = await fetch(`http://localhost:4000/api/reviews/${id}`, {
+      credentials: 'include'
+    });
+    
+    if (!response.ok) {
+      throw new Error('리뷰를 찾을 수 없습니다.');
+    }
 
-    if (!response.data.success || !response.data.review) {
+    const data = await response.json();
+    
+    if (!data.review) {
       return { notFound: true };
     }
 
     return {
       props: {
-        review: response.data.review
+        review: data.review
       }
     };
   } catch (error) {
-    console.error('에러 발생:', error);
+    console.error('리뷰 조회 오류:', error);
     return { notFound: true };
   }
 };
 
-export default function ReviewDetail({ review, error }: ReviewDetailProps) {
-  if (error) {
-    return (
-      <div className="container mx-auto px-4">
-        <Header />
-        <div className="mt-8 text-center text-red-600">{error}</div>
-      </div>
-    );
-  }
+interface ReviewProps {
+  review: ReviewData;
+}
+
+export default function ReviewDetail({ review }: ReviewProps) {
+  const [commentText, setCommentText] = useState('');
+  const { username } = useUser();
+
+  const handleCommentSubmit = async () => {
+    if (!commentText.trim()) return;
+    if (!username) {
+      alert('로그인이 필요합니다.');
+      return;
+    }
+
+    try {
+      const response = await axiosInstance.post(`/api/reviews/${review.id}/comments`, {
+        content: commentText
+      });
+
+      if (response.data.success) {
+        setCommentText(''); // 입력창 초기화
+        // TODO: 댓글 목록 새로고침
+      }
+    } catch (error) {
+      console.error('댓글 작성 오류:', error);
+      alert('댓글 작성에 실패했습니다.');
+    }
+  };
 
   if (!review) {
     return (
@@ -74,7 +103,11 @@ export default function ReviewDetail({ review, error }: ReviewDetailProps) {
           <p className="mb-1">도서: {review.bookTitle} ({review.bookAuthor} 저)</p>
           <p className="mb-1">출판사: {review.publisher}</p>
           <p className="mb-1">작성일: {review.createdAt 
-            ? new Date(review.createdAt).toLocaleDateString('ko-KR')
+            ? new Date(review.createdAt).toLocaleDateString('ko-KR', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+              })
             : '날짜 정보 없음'}</p>
           <p>조회수: {review.views}</p>
         </div>
@@ -88,13 +121,18 @@ export default function ReviewDetail({ review, error }: ReviewDetailProps) {
         
         <div className="mb-6">
           <textarea
+            value={commentText}
+            onChange={(e) => setCommentText(e.target.value)}
             className="w-full p-3 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             rows={3}
             placeholder="댓글을 작성해주세요"
           />
           <div className="mt-2 flex justify-end">
-            <button className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 text-sm">
-              댓글 작성
+            <button 
+              onClick={handleCommentSubmit}
+              className="px-2 py-1 bg-blue-500 text-white rounded-md hover:bg-blue-600 text-sm"
+            >
+              등록
             </button>
           </div>
         </div>

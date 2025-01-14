@@ -2,17 +2,17 @@ import express from 'express';
 import type { Response, NextFunction } from 'express-serve-static-core';
 import { getUserReviews, getUserComments } from '../controllers/userController';
 import verifyToken from '../middleware/auth';
-import type { CustomRequest } from '../types/auth';
-import User from '../models/User';
+import type { RequestWithUser } from '../types/auth';
+import { User } from '../models';
 
 const router = express.Router();
 
 // 타입 안전한 비동기 핸들러 수정
 const asyncHandler = (
-  fn: (req: CustomRequest, res: Response, next: NextFunction) => Promise<any>
+  fn: (req: RequestWithUser, res: Response, next: NextFunction) => Promise<any>
 ): express.RequestHandler => {
   return (req, res, next): void => {
-    Promise.resolve(fn(req as CustomRequest, res, next)).catch(next);
+    Promise.resolve(fn(req as RequestWithUser, res, next)).catch(next);
   };
 };
 

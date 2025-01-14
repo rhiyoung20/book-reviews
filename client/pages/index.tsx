@@ -117,7 +117,7 @@ function HomeComponent() {
         url += `&type=${type}&term=${encodeURIComponent(term)}`;
       }
 
-      const response = await axiosInstance.get<ReviewsResponse>(url);
+      const response = await axiosInstance.get(url);
       setReviews(response.data.reviews);
       setTotalPages(response.data.totalPages);
       setCurrentPage(page);
