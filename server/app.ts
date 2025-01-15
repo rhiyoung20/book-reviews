@@ -5,7 +5,8 @@ import session from 'express-session';
 import passport from 'passport';
 import config from './config/config';
 import router from './routes';
-import { sequelize } from './models';
+import sequelize from './config/database';
+import commentRouter from './routes/comments';
 
 // Passport 설정 파일 import (가장 먼저 해야 함)
 import './config/passport';
@@ -48,8 +49,8 @@ sequelize.sync()
   .then(() => {
     console.error('데이터베이스 연결 성공');
   })
-  .catch((err) => {
-    console.error('데이터베이스 연결 실패:', err);
+  .catch((error: Error) => {
+    console.error('데이터베이스 연결 실패:', error);
   });
 
 // 404 에러 처리
@@ -62,7 +63,7 @@ app.use((req, res) => {
 });
 
 // 에러 처리 미들웨어
-app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
   console.error('서버 에러:', err);
   res.status(500).json({
     success: false,

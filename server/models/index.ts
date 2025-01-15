@@ -2,19 +2,14 @@ import { Model, DataTypes } from 'sequelize';
 import sequelize from '../config/database';
 
 // User 모델
-class User extends Model {
+export class User extends Model {
   public id!: number;
   public username!: string;
   public googleId?: string;
   public kakaoId?: string;
-  public isAdmin?: boolean;
+  public isAdmin!: boolean;
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
-
-  static isAdminUsername(username: string): boolean {
-    const adminUsernames = ['책마을이장'];
-    return adminUsernames.includes(username);
-  }
 }
 
 User.init(
@@ -25,45 +20,46 @@ User.init(
       primaryKey: true,
     },
     username: {
-      type: DataTypes.STRING(191),
+      type: DataTypes.STRING,
       allowNull: false,
       unique: true,
     },
     googleId: {
-      type: DataTypes.STRING(191),
+      type: DataTypes.STRING,
       allowNull: true,
+      unique: true,
     },
     kakaoId: {
-      type: DataTypes.STRING(191),
+      type: DataTypes.STRING,
       allowNull: true,
+      unique: true,
     },
     isAdmin: {
       type: DataTypes.BOOLEAN,
-      allowNull: false,
-      defaultValue: false
-    }
+      defaultValue: false,
+    },
   },
   {
     sequelize,
-    tableName: 'users'
+    modelName: 'User',
   }
 );
 
 // Review 모델
-class Review extends Model {
+class ReviewModel extends Model {
   public id!: number;
   public title!: string;
-  public bookTitle!: string;
   public content!: string;
-  public views!: number;
   public username!: string;
-  public publisher!: string | null;
-  public bookAuthor!: string | null;
+  public bookTitle!: string;
+  public views?: number;
+  public publisher?: string;
+  public bookAuthor?: string;
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
 }
 
-Review.init(
+export const Review = ReviewModel.init(
   {
     id: {
       type: DataTypes.INTEGER,
@@ -74,21 +70,22 @@ Review.init(
       type: DataTypes.STRING(255),
       allowNull: false,
     },
-    bookTitle: {
-      type: DataTypes.STRING(255),
-      allowNull: false,
-    },
     content: {
       type: DataTypes.TEXT,
       allowNull: false,
     },
-    views: {
-      type: DataTypes.INTEGER,
-      defaultValue: 0,
-    },
     username: {
       type: DataTypes.STRING(255),
       allowNull: false,
+    },
+    bookTitle: {
+      type: DataTypes.STRING(255),
+      allowNull: false,
+    },
+    views: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      defaultValue: 0,
     },
     publisher: {
       type: DataTypes.STRING(255),
@@ -101,12 +98,12 @@ Review.init(
   },
   {
     sequelize,
-    tableName: 'reviews',
+    modelName: 'Review',
   }
 );
 
 // Comment 모델
-class Comment extends Model {
+class CommentModel extends Model {
   public id!: number;
   public content!: string;
   public username!: string;
@@ -116,7 +113,7 @@ class Comment extends Model {
   public readonly updatedAt!: Date;
 }
 
-Comment.init(
+export const Comment = CommentModel.init(
   {
     id: {
       type: DataTypes.INTEGER,
@@ -142,15 +139,27 @@ Comment.init(
   },
   {
     sequelize,
-    tableName: 'comments',
+    modelName: 'Comment',
   }
 );
 
-// 관계 설정
+// 모델 간 관계 설정
+User.hasMany(Review, {
+  foreignKey: 'username',
+  sourceKey: 'username',
+  as: 'reviews'
+});
+
 Review.belongsTo(User, {
   foreignKey: 'username',
   targetKey: 'username',
   as: 'user'
+});
+
+User.hasMany(Comment, {
+  foreignKey: 'username',
+  sourceKey: 'username',
+  as: 'comments'
 });
 
 Comment.belongsTo(User, {
@@ -159,14 +168,12 @@ Comment.belongsTo(User, {
   as: 'user'
 });
 
-Comment.belongsTo(Review, {
-  foreignKey: 'reviewId',
-  as: 'review'
-});
-
 Review.hasMany(Comment, {
   foreignKey: 'reviewId',
   as: 'comments'
 });
 
-export { User, Review, Comment, sequelize };
+Comment.belongsTo(Review, {
+  foreignKey: 'reviewId',
+  as: 'review'
+});

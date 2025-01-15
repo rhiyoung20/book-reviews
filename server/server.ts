@@ -1,26 +1,19 @@
 import app from './app';
-import { sequelize } from './models';
+import sequelize from './config/database';
+import config from './config/config';
 
-const PORT = process.env.PORT || 4000;
+const port = config.port;
 
-async function startServer() {
-  try {
-    // DB 연결 시도
-    await sequelize.authenticate();
+// 데이터베이스 연결 확인
+sequelize.authenticate()
+  .then(() => {
     console.log('데이터베이스 연결 성공');
     
-    // 필요한 경우 DB 동기화
-    await sequelize.sync();
-    console.log('데이터베이스 동기화 완료');
-
     // 서버 시작
-    app.listen(PORT, () => {
-      console.log(`서버가 포트 ${PORT}에서 실행 중입니다`);
+    app.listen(port, () => {
+      console.log(`서버가 포트 ${port}에서 실행 중입니다.`);
     });
-  } catch (error) {
-    console.error('서버 시작 실패:', error);
-    process.exit(1);
-  }
-}
-
-startServer(); 
+  })
+  .catch((error: Error) => {
+    console.error('데이터베이스 연결 실패:', error);
+  }); 

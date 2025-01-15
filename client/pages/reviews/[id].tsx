@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { GetServerSideProps } from 'next';
 import Header from '@/components/Header';
 import { axiosInstance } from '@/lib/axios';
@@ -14,6 +14,15 @@ interface ReviewData {
   publisher: string;
   createdAt: string;
   views: number;
+}
+
+// 기본 댓글 데이터 타입
+interface CommentData {
+  id: number;
+  content: string;
+  username: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 interface ReviewDetailProps {
@@ -60,7 +69,25 @@ interface ReviewProps {
 
 export default function ReviewDetail({ review }: ReviewProps) {
   const [commentText, setCommentText] = useState('');
+  const [comments, setComments] = useState<CommentData[]>([]);
   const { username } = useUser();
+
+  // 댓글 목록 조회
+  const fetchComments = async () => {
+    try {
+      const response = await axiosInstance.get(`/api/reviews/${review.id}/comments`);
+      if (response.data.success) {
+        setComments(response.data.comments as CommentData[]);
+      }
+    } catch (error) {
+      console.error('댓글 목록 조회 오류:', error);
+    }
+  };
+
+  // 컴포넌트 마운트 시 댓글 목록 조회
+  useEffect(() => {
+    fetchComments();
+  }, [review.id]);
 
   const handleCommentSubmit = async () => {
     if (!commentText.trim()) return;
@@ -70,19 +97,113 @@ export default function ReviewDetail({ review }: ReviewProps) {
     }
 
     try {
-      const response = await axiosInstance.post(`/api/reviews/${review.id}/comments`, {
-        content: commentText
+      const response = await axiosInstance.post(`/api/reviews/${review.id}/comment`, {
+        content: commentText.trim()
       });
 
       if (response.data.success) {
-        setCommentText(''); // 입력창 초기화
-        // TODO: 댓글 목록 새로고침
+        setCommentText('');
+        fetchComments();  // 댓글 작성 후 목록 새로고침
       }
     } catch (error) {
       console.error('댓글 작성 오류:', error);
       alert('댓글 작성에 실패했습니다.');
     }
   };
+
+  // CommentItem 컴포넌트 수정
+  const CommentItem = React.memo(({ comment }: { comment: CommentData }) => {
+    const { username } = useUser();
+    const [isEditing, setIsEditing] = useState(false);
+    const [editedContent, setEditedContent] = useState(comment.content);
+
+    const handleUpdate = async () => {
+      try {
+        const response = await axiosInstance.put(`/api/reviews/${review.id}/comments/${comment.id}`, {
+          content: editedContent
+        });
+        if (response.data.success) {
+          setIsEditing(false);
+          fetchComments();
+        }
+      } catch (error) {
+        console.error('댓글 수정 오류:', error);
+        alert('댓글 수정에 실패했습니다.');
+      }
+    };
+
+    const handleDelete = async () => {
+      if (!confirm('댓글을 삭제하시겠습니까?')) return;
+      
+      try {
+        const response = await axiosInstance.delete(`/api/reviews/${review.id}/comments/${comment.id}`);
+        if (response.data.success) {
+          fetchComments();
+        }
+      } catch (error) {
+        console.error('댓글 삭제 오류:', error);
+        alert('댓글 삭제에 실패했습니다.');
+      }
+    };
+
+    return (
+      <div className="p-4 bg-gray-50 rounded-md">
+        <div className="flex justify-between items-start mb-2">
+          <div>
+            <span className="font-medium text-sm">{comment.username}</span>
+            <span className="text-gray-500 text-xs ml-2">
+              {new Date(comment.createdAt).toLocaleDateString('ko-KR')}
+            </span>
+          </div>
+          {username === comment.username && (
+            <div className="space-x-2">
+              {isEditing ? (
+                <>
+                  <button 
+                    onClick={handleUpdate}
+                    className="text-gray-500 text-xs hover:text-blue-500"
+                  >
+                    저장
+                  </button>
+                  <button 
+                    onClick={() => setIsEditing(false)}
+                    className="text-gray-500 text-xs hover:text-gray-700"
+                  >
+                    취소
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button 
+                    onClick={() => setIsEditing(true)}
+                    className="text-gray-500 text-xs hover:text-blue-500"
+                  >
+                    수정
+                  </button>
+                  <button 
+                    onClick={handleDelete}
+                    className="text-gray-500 text-xs hover:text-red-500"
+                  >
+                    삭제
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+        {isEditing ? (
+          <textarea
+            value={editedContent}
+            onChange={(e) => setEditedContent(e.target.value)}
+            className="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            rows={3}
+          />
+        ) : (
+          <p className="text-sm text-gray-700">{comment.content}</p>
+        )}
+      </div>
+    );
+  });
 
   if (!review) {
     return (
@@ -138,19 +259,9 @@ export default function ReviewDetail({ review }: ReviewProps) {
         </div>
 
         <div className="space-y-4">
-          <div className="p-4 bg-gray-50 rounded-md">
-            <div className="flex justify-between items-start mb-2">
-              <div>
-                <span className="font-medium text-sm">사용자</span>
-                <span className="text-gray-500 text-xs ml-2">2024-01-03</span>
-              </div>
-              <div className="space-x-2">
-                <button className="text-gray-500 text-xs hover:text-blue-500">수정</button>
-                <button className="text-gray-500 text-xs hover:text-red-500">삭제</button>
-              </div>
-            </div>
-            <p className="text-sm text-gray-700">댓글 내용이 여기에 표시됩니다.</p>
-          </div>
+          {comments.map(comment => (
+            <CommentItem key={comment.id} comment={comment} />
+          ))}
         </div>
       </div>
     </div>

@@ -22,9 +22,18 @@ export const createComment = async (req: RequestWithUser, res: Response) => {
       reviewId: parseInt(reviewId)
     });
 
+    const commentWithUser = await Comment.findOne({
+      where: { id: comment.id },
+      include: [{
+        model: User,
+        as: 'user',
+        attributes: ['username']
+      }]
+    });
+
     return res.status(201).json({
       success: true,
-      comment
+      comment: commentWithUser
     });
   } catch (error) {
     console.error('댓글 생성 오류:', error);
@@ -39,6 +48,7 @@ export const createComment = async (req: RequestWithUser, res: Response) => {
 export const getComments = async (req: RequestWithUser, res: Response) => {
   try {
     const { reviewId } = req.params;
+    
     const comments = await Comment.findAll({
       where: { 
         reviewId: parseInt(reviewId) 
@@ -48,7 +58,9 @@ export const getComments = async (req: RequestWithUser, res: Response) => {
         as: 'user',
         attributes: ['username']
       }],
-      order: [['createdAt', 'ASC']]
+      order: [['createdAt', 'ASC']],
+      raw: true,
+      nest: true
     });
 
     return res.json({
@@ -59,7 +71,8 @@ export const getComments = async (req: RequestWithUser, res: Response) => {
     console.error('댓글 조회 오류:', error);
     return res.status(500).json({
       success: false,
-      message: '댓글을 불러오는데 실패했습니다.'
+      message: '댓글을 불러오는데 실패했습니다.',
+      error: error instanceof Error ? error.message : '알 수 없는 오류'
     });
   }
 };
