@@ -16,7 +16,10 @@
         "node",
         "express",
         "express-session"
-      ]
+      ],
+      "checkJs": true,
+      "allowJs": true,
+      "moduleResolution": "node"
     },
     "include": [
       "./**/*"

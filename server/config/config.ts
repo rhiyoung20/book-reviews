@@ -1,72 +1,60 @@
-import dotenv from 'dotenv';
+import { config as dotenvConfig } from "dotenv";
+dotenvConfig();
 
-// .env 파일 로드 (한 번만)
-if (!process.env.CONFIG_LOADED) {
-  dotenv.config();
-  process.env.CONFIG_LOADED = 'true';
+interface DbConfig {
+  host: string;
+  user: string;
+  password: string;
+  database: string;
 }
 
-// 필수 환경 변수 체크
-const requiredEnvVars = [
-  'GOOGLE_CLIENT_ID',
-  'GOOGLE_CLIENT_SECRET',
-  'KAKAO_CLIENT_ID',
-  'KAKAO_CLIENT_SECRET',
-  'JWT_SECRET',
-  'SESSION_SECRET',
-  'FRONTEND_URL'
-];
+interface EnvironmentConfig {
+  username: string;
+  password: string;
+  database: string;
+  host: string;
+  dialect: string;
+}
 
-requiredEnvVars.forEach(varName => {
-  if (!process.env[varName]) {
-    throw new Error(`환경 변수 ${varName}가 설정되지 않았습니다.`);
-  }
-});
+interface Config {
+  port: number;
+  db: DbConfig;
+  test: EnvironmentConfig;
+  production: EnvironmentConfig;
+  development: EnvironmentConfig;
+  sessionSecret: string;
+  google: {
+    clientId: string;
+    clientSecret: string;
+    callbackURL: string;
+  };
+  kakao: {
+    clientId: string;
+    clientSecret: string;
+    callbackURL: string;
+  };
+}
 
-// 기본값이 있는 환경 변수
-const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:4000';
+const env = process.env.NODE_ENV || 'development';
 
 const config = {
+  username: 'root',
+  password: 'Highting9103!',
+  database: 'book_reviews',
+  host: '127.0.0.1',
+  dialect: 'mysql' as const,
+  sessionSecret: 'c280a08016cdb5edb2042c377b732393a43c71e1192ef468a108df3580ad81919648fa9a90356cb40c45bd40ffa1e7445ee2a83f6e3e9158ca6166972461f74d',
+  jwtSecret: 'your-jwt-secret',
   google: {
-    clientId: process.env.GOOGLE_CLIENT_ID!,
-    clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-    callbackUrl: `${BACKEND_URL}/api/auth/google/callback`
+    clientId: process.env.GOOGLE_CLIENT_ID || 'your-google-client-id',
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET || 'your-google-client-secret',
+    callbackURL: process.env.GOOGLE_CALLBACK_URL || 'http://localhost:3000/auth/google/callback'
   },
   kakao: {
-    clientId: process.env.KAKAO_CLIENT_ID || '',
-    clientSecret: process.env.KAKAO_CLIENT_SECRET || '',
-    callbackUrl: process.env.KAKAO_LOGIN_CALLBACK_URL || '',
-    signupCallbackUrl: process.env.KAKAO_SIGNUP_CALLBACK_URL || ''
-  },
-  jwtSecret: process.env.JWT_SECRET!,
-  sessionSecret: process.env.SESSION_SECRET!,
-  frontendUrl: process.env.FRONTEND_URL!,
-  backendUrl: BACKEND_URL,
-  nodeEnv: process.env.NODE_ENV || 'development',
-  port: parseInt(process.env.PORT || '4000', 10)
+    clientId: process.env.KAKAO_CLIENT_ID || 'your-kakao-client-id',
+    clientSecret: process.env.KAKAO_CLIENT_SECRET || 'your-kakao-client-secret',
+    callbackURL: process.env.KAKAO_CALLBACK_URL || 'http://localhost:3000/auth/kakao/callback'
+  }
 };
-
-// 설정값 로깅 (한 번만)
-if (!process.env.CONFIG_LOGGED) {
-  console.log('Environment variables loaded from:', process.env.DOTENV_PATH || '.env');
-  console.log('OAuth Config:', {
-    google: {
-      hasClientId: !!config.google.clientId,
-      hasClientSecret: !!config.google.clientSecret,
-      callbackUrl: config.google.callbackUrl
-    },
-    kakao: {
-      hasClientId: !!config.kakao.clientId,
-      hasClientSecret: !!config.kakao.clientSecret,
-      callbackUrl: config.kakao.callbackUrl
-    }
-  });
-  process.env.CONFIG_LOGGED = 'true';
-}
-
-console.log('Kakao Config:', {
-  clientId: config.kakao.clientId,
-  callbackUrl: config.kakao.callbackUrl
-});
 
 export default config;

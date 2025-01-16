@@ -1,20 +1,20 @@
 import express from 'express';
-import authRouter from './auth';
-import reviewRouter from './reviews';
-import commentRouter from './comments';
+import reviewRoutes from './reviews';
+import authRoutes from './auth';
+import commentRoutes from './comments';
 
 const router = express.Router();
 
-// 디버깅을 위한 미들웨어 추가
-router.use((req, res, next) => {
-  console.log('요청 경로:', req.method, req.path);
-  next();
-});
+// 각 라우트 등록
+router.use('/reviews', reviewRoutes);
+router.use('/auth', authRoutes);     // auth 라우트 추가
+router.use('/comments', commentRoutes);
 
-router.use('/auth', authRouter);
-router.use('/reviews', reviewRouter);
-
-// 댓글 라우트를 reviews 하위에 직접 등록
-reviewRouter.use('/:reviewId', commentRouter);
+// 라우트 등록 확인을 위한 로그
+console.log('Registered routes:', 
+  router.stack
+    .map(r => r.route ? r.route.path : r.name)
+    .filter(Boolean)
+);
 
 export default router; 

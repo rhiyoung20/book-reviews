@@ -5,7 +5,7 @@ import session from 'express-session';
 import passport from 'passport';
 import config from './config/config';
 import router from './routes';
-import sequelize from './config/database';
+import sequelize from './models';
 import commentRouter from './routes/comments';
 
 // Passport 설정 파일 import (가장 먼저 해야 함)
@@ -43,15 +43,14 @@ app.use(passport.session());
 
 // API 라우트
 app.use('/api', router);
+app.use('/api/comments', commentRouter);
 
-// 데이터베이스 연결
-sequelize.sync()
-  .then(() => {
-    console.error('데이터베이스 연결 성공');
-  })
-  .catch((error: Error) => {
-    console.error('데이터베이스 연결 실패:', error);
-  });
+// 라우트 연결 확인을 위한 로그
+console.log('All registered routes:', 
+  app._router.stack
+    .filter((r: any) => r.route)
+    .map((r: any) => r.route.path)
+);
 
 // 404 에러 처리
 app.use((req, res) => {

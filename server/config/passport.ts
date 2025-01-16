@@ -1,88 +1,52 @@
 import passport from 'passport';
 import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
 import { Strategy as KakaoStrategy } from 'passport-kakao';
-import { User } from '../models';
-import config from '../config/config';
-import { Request } from 'express';
-import { Profile } from 'passport';
-import { VerifyCallback } from 'passport-oauth2';
+import config from './config';
 
-// Google Strategy 설정
+// Google OAuth 설정
 passport.use(
   new GoogleStrategy(
     {
-      clientID: config.google.clientId,
-      clientSecret: config.google.clientSecret,
-      callbackURL: `${config.backendUrl}/api/auth/google/callback`,
-      passReqToCallback: true
+      clientID: config.google?.clientId || '',
+      clientSecret: config.google?.clientSecret || '',
+      callbackURL: config.google?.callbackURL || ''
     },
-    async (_req: Request, _accessToken: string, _refreshToken: string, profile: Profile, done: VerifyCallback) => {
+    async (accessToken, refreshToken, profile, done) => {
       try {
-        const email = profile.emails?.[0]?.value;
-        if (!email) {
-          return done(null, false, { message: '이메일 정보를 가져올 수 없습니다.' });
-        }
-
-        const googleId = email.split('@')[0];
-        const user = await User.findOne({ where: { googleId } });
-
-        if (!user) {
-          return done(null, false, { message: '등록되지 않은 사용자입니다. 회원가입이 필요합니다.' });
-        }
-
-        return done(null, user);
+        // 사용자 정보 처리 로직
+        return done(null, profile);
       } catch (error) {
-        console.error('Google Strategy Error:', error);
-        return done(error as Error);
+        return done(error as Error, undefined);
       }
     }
   )
 );
 
-// Kakao Strategy 설정
+// Kakao OAuth 설정
 passport.use(
-  'kakao',
   new KakaoStrategy(
     {
-      clientID: config.kakao.clientId,
-      clientSecret: config.kakao.clientSecret,
-      callbackURL: config.kakao.callbackUrl
+      clientID: config.kakao?.clientId || '',
+      clientSecret: config.kakao?.clientSecret || '',
+      callbackURL: config.kakao?.callbackURL || ''
     },
-    async (_accessToken: string, _refreshToken: string, profile: any, done: VerifyCallback) => {
+    async (accessToken, refreshToken, profile, done) => {
       try {
-        const kakaoId = profile.id?.toString();
-        if (!kakaoId) {
-          return done(new Error('카카오 ID를 찾을 수 없습니다.'));
-        }
-
-        const user = await User.findOne({ where: { kakaoId } });
-        
-        if (!user) {
-          return done(null, false, { message: '등록되지 않은 사용자입니다. 회원가입이 필요합니다.' });
-        }
-
-        return done(null, user);
+        // 사용자 정보 처리 로직
+        return done(null, profile);
       } catch (error) {
-        console.error('Kakao Strategy Error:', error);
-        return done(error);
+        return done(error as Error, undefined);
       }
     }
   )
 );
 
-// 세션 직렬화
-passport.serializeUser((user: any, done) => {
-  done(null, user.id);
+passport.serializeUser((user, done) => {
+  done(null, user);
 });
 
-// 세션 역직렬화
-passport.deserializeUser(async (id: number, done) => {
-  try {
-    const user = await User.findByPk(id);
-    done(null, user);
-  } catch (error) {
-    done(error);
-  }
+passport.deserializeUser((user: any, done) => {
+  done(null, user);
 });
 
 export default passport;

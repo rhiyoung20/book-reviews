@@ -4,10 +4,10 @@
     "description": "책익는 마을 - 독서 리뷰 공유 플랫폼",
     "main": "server/app.ts",
     "scripts": {
-        "start": "node dist/server.ts",
-        "dev": "ts-node server.ts",
+        "start": "NODE_ENV=production node dist/app.js",
+        "dev": "set NODE_ENV=development&& ts-node server/app.ts",
         "build": "tsc",
-        "test": "jest"
+        "test": "NODE_ENV=test jest"
     },
     "dependencies": {
         "@radix-ui/react-label": "^2.1.0",

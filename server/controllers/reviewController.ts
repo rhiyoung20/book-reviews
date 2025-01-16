@@ -1,14 +1,19 @@
 import type { Request, Response } from 'express';
-import { Review, User, Comment } from '../models';
+import { sequelize } from '../models';
+import { User, Review, Comment } from '../models';
 import { RequestWithUser } from '../types/auth';
 import { Op } from 'sequelize';
 
 // 리뷰 생성
 export const createReview = async (req: RequestWithUser, res: Response) => {
+  const t = await sequelize.transaction();
+
   try {
     const { content, title, bookTitle, publisher, bookAuthor } = req.body;
-    
-    if (!req.user?.username) {
+    const username = req.user?.username;
+
+    if (!username) {
+      await t.rollback();
       return res.status(401).json({
         success: false,
         message: '인증이 필요합니다.'
@@ -16,6 +21,7 @@ export const createReview = async (req: RequestWithUser, res: Response) => {
     }
 
     if (!title || !bookTitle || !content) {
+      await t.rollback();
       return res.status(400).json({
         success: false,
         message: '제목, 책 제목, 내용은 필수 입력사항입니다.'
@@ -26,22 +32,26 @@ export const createReview = async (req: RequestWithUser, res: Response) => {
       title,
       bookTitle,
       content,
-      username: req.user.username,
-      views: 0,
+      username,
       publisher,
       bookAuthor
-    });
+    }, { transaction: t });
+
+    await t.commit();
 
     return res.json({
       success: true,
       review
     });
   } catch (error) {
-    console.error('리뷰 생성 오류:', error);
-    return res.status(500).json({
-      success: false,
-      message: '리뷰 생성 중 오류가 발생했습니다.'
-    });
+    console.error('리뷰 생성 중 오류 발생:', error);
+    try {
+      await t.rollback();
+      console.error('트랜잭션 롤백 완료');
+    } catch (rollbackError) {
+      console.error('트랜잭션 롤백 실패:', rollbackError);
+    }
+    return res.status(500).json({ success: false, message: '리뷰 생성 실패' });
   }
 };
 
@@ -49,124 +59,119 @@ export const createReview = async (req: RequestWithUser, res: Response) => {
 export const getReviews = async (req: Request, res: Response) => {
   try {
     const page = parseInt(req.query.page as string) || 1;
-    const limit = 10; // 페이지당 항목 수
+    const limit = 10;
     const offset = (page - 1) * limit;
+    const searchType = req.query.type as string;
+    const searchTerm = req.query.term as string;
 
-    const { type, term } = req.query;
-    
     let whereClause = {};
-    if (type && term) {
+    if (searchType && searchTerm) {
       whereClause = {
-        [type === 'title' ? 'title' : 'username']: {
-          [Op.like]: `%${term}%`
+        [searchType]: {
+          [Op.like]: `%${searchTerm}%`
         }
       };
     }
 
     const { count, rows: reviews } = await Review.findAndCountAll({
       where: whereClause,
-      include: [{
-        model: User,
-        as: 'user',
-        attributes: ['username']
-      }],
       order: [['createdAt', 'DESC']],
       limit,
       offset
     });
 
-    const totalPages = Math.ceil(count / limit);
-
     return res.json({
-      success: true,
       reviews,
       currentPage: page,
-      totalPages,
+      totalPages: Math.ceil(count / limit),
       totalReviews: count
     });
   } catch (error) {
-    console.error('리뷰 목록 조회 오류:', error);
-    return res.status(500).json({
-      success: false,
-      message: '리뷰 목록을 불러오는데 실패했습니다.'
+    console.error('상세 에러 정보:', error);
+    return res.status(500).json({ 
+      message: '리뷰 목록을 불러오는 중 오류가 발생했습니다.',
+      error: error instanceof Error ? error.message : '알 수 없는 오류'
     });
   }
 };
 
 // 리뷰 조회
-export const getReview = async (req: RequestWithUser, res: Response) => {
+export const getReview = async (req: Request, res: Response) => {
   try {
     const reviewId = parseInt(req.params.id);
     
-    const review = await Review.findOne({
-      where: { id: reviewId },
+    const review = await Review.findByPk(reviewId, {
       include: [{
-        model: User,
-        as: 'user',
-        attributes: ['username']
+        model: Comment,
+        as: 'comments',
+        include: [{
+          model: User,
+          as: 'user',
+          attributes: ['username']
+        }]
       }]
     });
 
     if (!review) {
-      return res.status(404).json({ 
-        success: false,
-        message: '리뷰를 찾을 수 없습니다.' 
-      });
+      return res.status(404).json({ message: '리뷰를 찾을 수 없습니다.' });
     }
 
-    return res.json({
-      success: true,
-      review
-    });
+    return res.json(review);
   } catch (error) {
     console.error('리뷰 조회 오류:', error);
-    return res.status(500).json({ 
-      success: false,
-      message: '리뷰 조회 중 오류가 발생했습니다.' 
-    });
+    return res.status(500).json({ message: '리뷰 조회 중 오류가 발생했습니다.' });
   }
 };
 
 // 리뷰 수정
 export const updateReview = async (req: RequestWithUser, res: Response) => {
+  const t = await sequelize.transaction();
+
   try {
     const reviewId = parseInt(req.params.id);
     const { title, bookTitle, content, publisher, bookAuthor } = req.body;
+    const username = req.user?.username;
 
-    if (!req.user?.username) {
+    if (!username) {
+      await t.rollback();
       return res.status(401).json({
         success: false,
         message: '인증이 필요합니다.'
       });
     }
 
-    const existingReview = await Review.findOne({
-      where: { 
+    const review = await Review.findOne({
+      where: {
         id: reviewId,
-        username: req.user.username
-      }
+        username
+      },
+      transaction: t
     });
 
-    if (!existingReview) {
+    if (!review) {
+      await t.rollback();
       return res.status(404).json({
         success: false,
         message: '리뷰를 찾을 수 없거나 수정 권한이 없습니다.'
       });
     }
 
-    await existingReview.update({
-      ...(title && { title }),
-      ...(bookTitle && { bookTitle }),
-      ...(content && { content }),
-      ...(publisher && { publisher }),
-      ...(bookAuthor && { bookAuthor })
-    });
+    await review.update({
+      title,
+      bookTitle,
+      content,
+      publisher,
+      bookAuthor
+    }, { transaction: t });
+
+    await t.commit();
 
     return res.json({
       success: true,
-      review: existingReview
+      review
     });
   } catch (error) {
+    await t.rollback();
     console.error('리뷰 수정 오류:', error);
     return res.status(500).json({
       success: false,
@@ -177,86 +182,230 @@ export const updateReview = async (req: RequestWithUser, res: Response) => {
 
 // 리뷰 삭제
 export const deleteReview = async (req: RequestWithUser, res: Response) => {
+  const t = await sequelize.transaction();
+
   try {
     const reviewId = parseInt(req.params.id);
     const username = req.user?.username;
 
     if (!username) {
+      await t.rollback();
       return res.status(401).json({
         success: false,
         message: '인증이 필요합니다.'
       });
     }
 
-    const existingReview = await Review.findOne({
-      where: { 
+    // 리뷰 존재 여부와 권한 확인
+    const review = await Review.findOne({
+      where: {
         id: reviewId,
         username
-      }
+      },
+      transaction: t
     });
 
-    if (!existingReview) {
-      return res.status(404).json({ 
+    if (!review) {
+      await t.rollback();
+      return res.status(404).json({
         success: false,
-        message: '리뷰를 찾을 수 없거나 삭제 권한이 없습니다.' 
+        message: '리뷰를 찾을 수 없거나 삭제 권한이 없습니다.'
       });
     }
 
-    await existingReview.destroy();
+    // 먼저 관련된 댓글들을 삭제
+    await Comment.destroy({
+      where: { reviewId },
+      transaction: t
+    });
+
+    // 그 다음 리뷰 삭제
+    await review.destroy({ transaction: t });
+    await t.commit();
 
     return res.json({
       success: true,
       message: '리뷰가 삭제되었습니다.'
     });
   } catch (error) {
-    console.error('리뷰 삭제 오류:', error);
-    return res.status(500).json({ 
-      success: false,
-      message: '리뷰 삭제 중 오류가 발생했습니다.' 
-    });
+    console.error('리뷰 삭제 중 오류 발생:', error);
+    try {
+      await t.rollback();
+      console.error('트랜잭션 롤백 완료');
+    } catch (rollbackError) {
+      console.error('트랜잭션 롤백 실패:', rollbackError);
+    }
+    return res.status(500).json({ success: false, message: '리뷰 삭제 실패' });
   }
 };
 
-// 댓글 작성
+// 댓글 생성
 export const createComment = async (req: RequestWithUser, res: Response) => {
+  const t = await sequelize.transaction();
+
   try {
     const reviewId = parseInt(req.params.id);
     const { content } = req.body;
-    
-    // 사용자 인증 확인
-    if (!req.user?.username) {
+    const username = req.user?.username;
+
+    if (!username) {
+      await t.rollback();
       return res.status(401).json({
         success: false,
         message: '인증이 필요합니다.'
       });
     }
 
-    // 리뷰 존재 여부 확인
-    const review = await Review.findByPk(reviewId);
-    if (!review) {
-      return res.status(404).json({
+    if (!content) {
+      await t.rollback();
+      return res.status(400).json({
         success: false,
-        message: '리뷰를 찾을 수 없습니다.'
+        message: '댓글 내용은 필수 입력사항입니다.'
       });
     }
 
-    // 댓글 생성
     const comment = await Comment.create({
       content,
-      username: req.user.username,
+      username,
       reviewId
-    });
+    }, { transaction: t });
 
-    // 생성된 댓글 반환
-    return res.status(201).json({
+    await t.commit();
+
+    return res.json({
       success: true,
       comment
     });
   } catch (error) {
-    console.error('댓글 작성 오류:', error);
+    await t.rollback();
+    console.error('댓글 생성 오류:', error);
     return res.status(500).json({
       success: false,
-      message: '댓글 작성 중 오류가 발생했습니다.'
+      message: '댓글 생성 중 오류가 발생했습니다.'
+    });
+  }
+};
+
+// 댓글 목록 조회
+export const getComments = async (req: Request, res: Response) => {
+  try {
+    const reviewId = parseInt(req.params.id);
+
+    const comments = await Comment.findAll({
+      where: { reviewId },
+      order: [['createdAt', 'ASC']],
+      include: [{
+        model: User,
+        as: 'user',
+        attributes: ['username']
+      }]
+    });
+
+    return res.json({
+      success: true,
+      comments
+    });
+  } catch (error) {
+    console.error('댓글 목록 조회 오류:', error);
+    return res.status(500).json({
+      success: false,
+      message: '댓글 목록 조회 중 오류가 발생했습니다.'
+    });
+  }
+};
+
+// 댓글 수정
+export const updateComment = async (req: RequestWithUser, res: Response) => {
+  const t = await sequelize.transaction();
+
+  try {
+    const commentId = parseInt(req.params.commentId);
+    const { content } = req.body;
+    const username = req.user?.username;
+
+    if (!username) {
+      await t.rollback();
+      return res.status(401).json({
+        success: false,
+        message: '인증이 필요합니다.'
+      });
+    }
+
+    const comment = await Comment.findOne({
+      where: {
+        id: commentId,
+        username
+      },
+      transaction: t
+    });
+
+    if (!comment) {
+      await t.rollback();
+      return res.status(404).json({
+        success: false,
+        message: '댓글을 찾을 수 없거나 수정 권한이 없습니다.'
+      });
+    }
+
+    await comment.update({ content }, { transaction: t });
+    await t.commit();
+
+    return res.json({
+      success: true,
+      comment
+    });
+  } catch (error) {
+    await t.rollback();
+    console.error('댓글 수정 오류:', error);
+    return res.status(500).json({
+      success: false,
+      message: '댓글 수정 중 오류가 발생했습니다.'
+    });
+  }
+};
+
+// 댓글 삭제
+export const deleteComment = async (req: RequestWithUser, res: Response) => {
+  const t = await sequelize.transaction();
+
+  try {
+    const commentId = parseInt(req.params.commentId);
+    const reviewId = parseInt(req.params.id);
+
+    if (!req.user) {
+      await t.rollback();
+      return res.status(401).json({
+        success: false,
+        message: '인증이 필요합니다.'
+      });
+    }
+
+    const comment = await Comment.findOne({
+      where: {
+        id: commentId,
+        reviewId,
+        username: req.user.username
+      }
+    });
+
+    if (!comment) {
+      return res.status(404).json({
+        success: false,
+        message: '댓글을 찾을 수 없거나 삭제 권한이 없습니다.'
+      });
+    }
+
+    await comment.destroy();
+
+    return res.json({
+      success: true,
+      message: '댓글이 삭제되었습니다.'
+    });
+  } catch (error) {
+    console.error('댓글 삭제 오류:', error);
+    return res.status(500).json({
+      success: false,
+      message: '댓글 삭제 중 오류가 발생했습니다.'
     });
   }
 };

@@ -1,7 +1,7 @@
 import express from 'express';
 import type { Response, NextFunction } from 'express-serve-static-core';
 import { getUserReviews, getUserComments } from '../controllers/userController';
-import verifyToken from '../middleware/auth';
+import { authenticate } from '../middleware/auth';
 import type { RequestWithUser } from '../types/auth';
 import { User } from '../models';
 
@@ -12,21 +12,15 @@ const asyncHandler = (
   fn: (req: RequestWithUser, res: Response, next: NextFunction) => Promise<any>
 ): express.RequestHandler => {
   return (req, res, next): void => {
-    Promise.resolve(fn(req as RequestWithUser, res, next)).catch(next);
+    fn(req as RequestWithUser, res, next).catch(next);
   };
 };
 
 // 사용자의 리뷰 목록 조회
-router.get('/reviews', 
-  verifyToken as express.RequestHandler,
-  asyncHandler(getUserReviews)
-);
+router.get('/reviews', authenticate, asyncHandler(getUserReviews));
 
 // 사용자의 댓글 목록 조회
-router.get('/comments', 
-  verifyToken as express.RequestHandler,
-  asyncHandler(getUserComments)
-);
+router.get('/comments', authenticate, asyncHandler(getUserComments));
 
 // 회원가입 테스트 라우트
 router.post('/test-signup', async (req, res) => {

@@ -1,5 +1,5 @@
 import express from 'express';
-import { RequestWithUser } from '../types/auth';
+import type { RequestHandler } from 'express';
 import {
   createComment,
   deleteComment,
@@ -7,23 +7,23 @@ import {
   updateComment,
   getUserComments
 } from '../controllers/commentController';
-import verifyToken from '../middleware/auth';
+import { authenticate } from '../middleware/auth';
 
 const router = express.Router({ mergeParams: true });
 
 // 사용자별 댓글 목록 조회
-router.get('/user/:username', verifyToken, getUserComments);
+router.get('/user/:username', authenticate as RequestHandler, getUserComments as RequestHandler);
 
 // 댓글 목록 조회
-router.get('/', getComments);
+router.get('/', getComments as RequestHandler);
 
 // 댓글 작성
-router.post('/', verifyToken, createComment);
+router.post('/', authenticate as RequestHandler, createComment as RequestHandler);
 
 // 댓글 수정
-router.put('/:id', verifyToken, updateComment);
+router.put('/:id', authenticate as RequestHandler, updateComment as RequestHandler);
 
 // 댓글 삭제
-router.delete('/:id', verifyToken, deleteComment);
+router.delete('/:id', authenticate as RequestHandler, deleteComment as RequestHandler);
 
 export default router;

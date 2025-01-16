@@ -8,7 +8,7 @@ import { RequestWithUser } from '../types/auth';
 const router = Router();
 
 // JWT 토큰 생성 함수
-const generateToken = (user: Express.User) => {
+const generateToken = (user: User) => {
   if (!config.jwtSecret) {
     throw new Error('JWT_SECRET is not configured');
   }
@@ -73,22 +73,18 @@ router.get('/kakao',
 );
 
 // Kakao 콜백
-router.get(
-  '/kakao/callback',
+router.get('/kakao/callback',
   passport.authenticate('kakao', { 
-    session: false,
     failureRedirect: `${process.env.FRONTEND_URL}/login?error=auth_failed` 
   }),
   async (req: Request, res: Response) => {
     try {
       const user = req.user as User;
       if (!user) {
-        throw new Error('사용자 정보를 찾을 수 없습니다.');
+        throw new Error('사용자를 찾을 수 없습니다.');
       }
 
       const token = generateToken(user);
-      
-      // 프론트엔드로 리다이렉트
       res.redirect(
         `${process.env.FRONTEND_URL}/?token=${token}&username=${encodeURIComponent(user.username)}&status=success`
       );
